@@ -1,7 +1,7 @@
 {
-  "name": "@ycdirectory/ui",
+  "name": "@ycdirectory/wallet-sdk",
   "version": "0.1.0",
-  "description": "Modern React UI components with Tailwind CSS",
+  "description": "Modern wallet connection SDK with React components and multi-wallet support",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -12,15 +12,12 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsup src/index.tsx --format esm,cjs --dts --external react",
-    "dev": "tsup src/index.tsx --format esm,cjs --watch --dts --external react",
+    "build": "tsup src/index.ts --format esm,cjs --dts --external react --jsx preserve",
+    "dev": "tsup src/index.ts --format esm,cjs --watch --dts --external react --jsx preserve",
     "lint": "eslint \"src/**/*.ts*\"",
     "clean": "git clean -xdf .turbo node_modules out dist lib storybook-static",
     "prebuild": "rimraf dist",
-    "build:rollup": "rimraf dist && NODE_ENV=production rollup --config rollup.config.mjs",
-    "build:vite": "vite build",
-    "build:local": "npm run build && npm pack",
-    "storybook": "storybook dev -p 6007",
+    "storybook": "storybook dev -p 6008",
     "build-storybook": "storybook build",
     "test": "jest",
     "prepublishOnly": "npm run build",
@@ -49,6 +46,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.56.0",
+    "eslint-config-custom": "workspace:*",
     "jest": "^29.5.0",
     "postcss": "^8.4.32",
     "react": "^18.2.0",
@@ -70,10 +68,9 @@
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",
-    "@wagmi/core": "^2.21.2",
     "ethers": "^6.15.0",
-    "viem": "^2.37.9",
-    "wagmi": "^2.17.5"
+    "viem": "^2.21.35",
+    "wagmi": "^2.16.9"
   },
   "publishConfig": {
     "access": "public"
@@ -84,14 +81,14 @@
   },
   "keywords": [
     "react",
-    "ui",
-    "components",
-    "tailwindcss",
-    "design-system",
     "wallet",
+    "ethereum",
     "web3",
     "blockchain",
-    "ethereum"
+    "sdk",
+    "components",
+    "rainbowkit",
+    "wagmi"
   ],
   "author": "YCDirectory"
 }

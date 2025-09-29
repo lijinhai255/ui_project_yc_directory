@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OKX Wallet Debug Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .logs {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .clear {
+            background: #dc3545;
+        }
+        .clear:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 OKX Wallet Debug Test</h1>
+
+    <div class="section">
+        <h3>Provider Detection</h3>
+        <button class="button" onclick="detectProviders()">检测钱包</button>
+        <button class="button" onclick="testOKXDirect()">直接测试OKX</button>
+        <button class="button" onclick="testOKXNoTimeout()">测试OKX(无超时)</button>
+        <button class="button" onclick="testOKXEnable()">测试OKX启用</button>
+        <button class="button" onclick="testOKXAlternativeMethods()">测试OKX备用方法</button>
+        <button class="button" onclick="testOKXChainIdFirst()">测试OKX链ID优先</button>
+        <button class="button" onclick="testEthereumDirect()">直接测试Ethereum</button>
+        <button class="button" onclick="testForceOKXPopup()">强制测试OKX弹窗</button>
+        <button class="button" onclick="testWalletSDKDetection()">测试WalletSDK检测</button>
+        <button class="button" onclick="diagnoseOKXIssue()">诊断OKX问题</button>
+        <button class="button" onclick="testDirectConnection()">直接连接测试</button>
+    </div>
+
+    <div class="section">
+        <h3>Connection Tests</h3>
+        <button class="button" onclick="testOKXConnection()">OKX 连接测试</button>
+        <button class="button" onclick="testMetaMaskConnection()">MetaMask 连接测试</button>
+    </div>
+
+    <div class="section">
+        <h3>Debug Controls</h3>
+        <button class="button clear" onclick="clearLogs()">清空日志</button>
+        <button class="button" onclick="checkWindowObjects()">检查Window对象</button>
+    </div>
+
+    <div class="section">
+        <h3>Console Logs</h3>
+        <div id="logs" class="logs"></div>
+    </div>
+
+    <script>
+        let logs = [];
+
+        function log(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+            logs.push(logMessage);
+
+            if (data) {
+                logs.push(JSON.stringify(data, null, 2));
+            }
+
+            updateLogsDisplay();
+            console.log(logMessage, data || '');
+        }
+
+        function error(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ❌ ERROR: ${message}`;
+            logs.push(logMessage);
+
+            if (data) {
+                logs.push(JSON.stringify(data, null, 2));
+            }
+
+            updateLogsDisplay();
+            console.error(logMessage, data || '');
+        }
+
+        function updateLogsDisplay() {
+            document.getElementById('logs').textContent = logs.join('\n');
+            document.getElementById('logs').scrollTop = document.getElementById('logs').scrollHeight;
+        }
+
+        function clearLogs() {
+            logs = [];
+            updateLogsDisplay();
+        }
+
+        function detectProviders() {
+            log('=== 开始检测钱包提供者 (EIP-6963优先) ===');
+
+            // 首先尝试EIP-6963检测
+            detectEIP6963Providers();
+
+            // 然后检查传统方式
+            setTimeout(() => {
+                detectLegacyProviders();
+            }, 200);
+        }
+
+        function detectEIP6963Providers() {
+            log('🔍 EIP-6963标准检测...');
+
+            const announceEvent = 'eip6963:announceProvider';
+            const requestEvent = 'eip6963:requestProvider';
+            const detectedWallets = [];
+
+            const handleAnnounce = (event) => {
+                const detail = event.detail;
+                log(`📡 EIP-6963检测到: ${detail.info.name}`, {
+                    rdns: detail.info.rdns,
+                    uuid: detail.info.uuid,
+                    hasProvider: !!detail.provider,
+                    hasRequest: typeof detail.provider?.request === 'function'
+                });
+
+                detectedWallets.push(detail);
+            };
+
+            // 设置临时监听器
+            window.addEventListener(announceEvent, handleAnnounce);
+
+            // 发送请求
+            window.dispatchEvent(new Event(requestEvent));
+
+            // 等待响应后清理
+            setTimeout(() => {
+                window.removeEventListener(announceEvent, handleAnnounce);
+
+                if (detectedWallets.length === 0) {
+                    log('⚠️ 未通过EIP-6963检测到钱包');
+                } else {
+                    log(`✅ EIP-6963检测到 ${detectedWallets.length} 个钱包`);
+
+                    // 检查是否有OKX
+                    const okxWallet = detectedWallets.find(w =>
+                        w.info.rdns.toLowerCase().includes('okx') ||
+                        w.info.name.toLowerCase().includes('okx')
+                    );
+
+                    if (okxWallet) {
+                        log('🎯 通过EIP-6963找到OKX钱包!');
+                    }
+                }
+            }, 300);
+        }
+
+        function detectLegacyProviders() {
+            log('🔍 Legacy方式检测...');
+
+            // 检查 window.ethereum
+            if (window.ethereum) {
+                log('✅ window.ethereum 存在');
+                log('window.ethereum 类型:', typeof window.ethereum);
+                log('window.ethereum 标识:', {
+                    isMetaMask: window.ethereum.isMetaMask,
+                    isOkxWallet: window.ethereum.isOkxWallet,
+                    isCoinbaseWallet: window.ethereum.isCoinbaseWallet,
+                    isRabby: window.ethereum.isRabby,
+                    isTrust: window.ethereum.isTrust
+                });
+
+                // 检查是否有request方法
+                if (typeof window.ethereum.request === 'function') {
+                    log('✅ window.ethereum.request 方法存在');
+                } else {
+                    error('❌ window.ethereum.request 方法不存在');
+                }
+            } else {
+                error('❌ window.ethereum 不存在');
+            }
+
+            // 检查 window.okxwallet
+            if (window.okxwallet) {
+                log('✅ window.okxwallet 存在');
+                log('window.okxwallet 类型:', typeof window.okxwallet);
+
+                // 检查是否有request方法
+                if (typeof window.okxwallet.request === 'function') {
+                    log('✅ window.okxwallet.request 方法存在');
+                } else {
+                    error('❌ window.okxwallet.request 方法不存在');
+                }
+            } else {
+                log('⚠️ window.okxwallet 不存在');
+            }
+
+            // 检查其他钱包
+            const otherWallets = ['coinbaseWalletExtension', 'rabby', 'trustWallet'];
+            otherWallets.forEach(wallet => {
+                if (window[wallet]) {
+                    log(`✅ window.${wallet} 存在`);
+                } else {
+                    log(`⚠️ window.${wallet} 不存在`);
+                }
+            });
+        }
+
+        function checkWindowObjects() {
+            log('=== 检查Window对象 ===');
+            const windowProps = Object.keys(window);
+            const walletRelated = windowProps.filter(prop =>
+                prop.toLowerCase().includes('wallet') ||
+                prop.toLowerCase().includes('ethereum') ||
+                prop.toLowerCase().includes('okx') ||
+                prop.toLowerCase().includes('metamask') ||
+                prop.toLowerCase().includes('coinbase') ||
+                prop.toLowerCase().includes('rabby') ||
+                prop.toLowerCase().includes('trust')
+            );
+
+            log('钱包相关对象:', walletRelated);
+        }
+
+        async function testOKXDirect() {
+            log('=== 直接测试OKX Wallet ===');
+
+            try {
+                let provider = window.okxwallet;
+
+                if (!provider) {
+                    // 尝试 window.ethereum.isOkxWallet
+                    if (window.ethereum && window.ethereum.isOkxWallet) {
+                        provider = window.ethereum;
+                        log('使用 window.ethereum (isOkxWallet: true)');
+                    } else {
+                        error('未找到OKX Wallet提供者');
+                        return;
+                    }
+                } else {
+                    log('使用 window.okxwallet');
+                }
+
+                log('OKX Provider信息:', {
+                    type: typeof provider,
+                    hasRequest: typeof provider.request === 'function',
+                    methods: Object.getOwnPropertyNames(provider).filter(n => typeof provider[n] === 'function')
+                });
+
+                // 测试请求
+                if (typeof provider.request === 'function') {
+                    log('测试 eth_chainId 请求...');
+                    try {
+                        const chainId = await provider.request({ method: 'eth_chainId' });
+                        log('✅ eth_chainId 成功:', chainId);
+                    } catch (e) {
+                        error('eth_chainId 失败:', e.message);
+                    }
+
+                    log('测试 eth_requestAccounts 请求...');
+                    try {
+                        const accounts = await Promise.race([
+                            provider.request({ method: 'eth_requestAccounts' }),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('30秒超时')), 30000))
+                        ]);
+                        log('✅ eth_requestAccounts 成功:', accounts);
+                    } catch (e) {
+                        error('eth_requestAccounts 失败:', e.message);
+                    }
+                } else {
+                    error('OKX Provider 没有 request 方法');
+                }
+
+            } catch (e) {
+                error('OKX测试失败:', e.message);
+            }
+        }
+
+        async function testEthereumDirect() {
+            log('=== 直接测试Ethereum ===');
+
+            try {
+                const provider = window.ethereum;
+
+                if (!provider) {
+                    error('window.ethereum 不存在');
+                    return;
+                }
+
+                log('Ethereum Provider信息:', {
+                    type: typeof provider,
+                    hasRequest: typeof provider.request === 'function',
+                    methods: Object.getOwnPropertyNames(provider).filter(n => typeof provider[n] === 'function'),
+                    flags: {
+                        isMetaMask: provider.isMetaMask,
+                        isOkxWallet: provider.isOkxWallet,
+                        isCoinbaseWallet: provider.isCoinbaseWallet
+                    }
+                });
+
+                // 测试请求
+                if (typeof provider.request === 'function') {
+                    log('测试 eth_chainId 请求...');
+                    try {
+                        const chainId = await provider.request({ method: 'eth_chainId' });
+                        log('✅ eth_chainId 成功:', chainId);
+                    } catch (e) {
+                        error('eth_chainId 失败:', e.message);
+                    }
+
+                    log('测试 eth_requestAccounts 请求...');
+                    try {
+                        const accounts = await Promise.race([
+                            provider.request({ method: 'eth_requestAccounts' }),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('30秒超时')), 30000))
+                        ]);
+                        log('✅ eth_requestAccounts 成功:', accounts);
+                    } catch (e) {
+                        error('eth_requestAccounts 失败:', e.message);
+                    }
+                } else {
+                    error('Ethereum Provider 没有 request 方法');
+                }
+
+            } catch (e) {
+                error('Ethereum测试失败:', e.message);
+            }
+        }
+
+        async function testOKXConnection() {
+            log('=== OKX连接测试 (模拟SDK逻辑) ===');
+
+            try {
+                // 模拟我们SDK的逻辑
+                const windowEth = window;
+                const ethereum = windowEth.ethereum;
+
+                if (!ethereum) {
+                    error('window.ethereum 不存在');
+                    return;
+                }
+
+                const provider = ethereum;
+
+                // 检测OKX
+                log('检测OKX Wallet:', {
+                    'window.ethereum.isOkxWallet': provider.isOkxWallet,
+                    'window.okxwallet': !!windowEth.okxwallet,
+                    'window.ethereum exists': !!provider
+                });
+
+                if (provider.isOkxWallet || windowEth.okxwallet) {
+                    const okxProvider = windowEth.okxwallet || provider;
+                    log('使用OKX Provider:', {
+                        'provider': okxProvider === provider ? 'window.ethereum' : 'window.okxwallet',
+                        'has request': typeof okxProvider.request === 'function',
+                        'provider methods': Object.getOwnPropertyNames(okxProvider).filter(n => typeof okxProvider[n] === 'function')
+                    });
+
+                    // 尝试连接
+                    log('🔄 OKX Wallet 连接中...');
+
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error('连接请求超时')), 30000);
+                    });
+
+                    const requestPayload = {
+                        method: 'eth_requestAccounts',
+                        params: []
+                    };
+
+                    log('🚀 发送请求:', requestPayload);
+
+                    let accountsPromise;
+                    try {
+                        accountsPromise = okxProvider.request(requestPayload);
+                        log('⏳ 等待响应...');
+                    } catch (syncError) {
+                        error('同步请求失败:', syncError.message);
+                        throw syncError;
+                    }
+
+                    let accounts;
+                    try {
+                        accounts = await Promise.race([accountsPromise, timeoutPromise]);
+                        log('✅ 连接成功:', accounts);
+                    } catch (asyncError) {
+                        error('异步请求失败:', asyncError.message);
+                        throw asyncError;
+                    }
+
+                } else {
+                    error('未检测到OKX Wallet');
+                }
+
+            } catch (e) {
+                error('OKX连接测试失败:', e.message);
+            }
+        }
+
+        async function testOKXEnable() {
+            log('=== OKX启用测试 ===');
+
+            try {
+                if (!window.okxwallet) {
+                    error('window.okxwallet 不存在');
+                    return;
+                }
+
+                log('OKX Wallet 对象信息:', {
+                    'type': typeof window.okxwallet,
+                    'constructor': window.okxwallet.constructor.name,
+                    'keys': Object.keys(window.okxwallet),
+                    'methods': Object.getOwnPropertyNames(window.okxwallet).filter(n => typeof window.okxwallet[n] === 'function')
+                });
+
+                // 检查是否有启用或连接方法
+                const possibleMethods = ['enable', 'connect', 'requestAccounts', 'isConnected', 'isUnlocked'];
+                for (const method of possibleMethods) {
+                    if (typeof window.okxwallet[method] === 'function') {
+                        log(`发现方法 ${method}:`, window.okxwallet[method]);
+                    }
+                }
+
+                // 测试 enable 方法 (一些旧钱包需要这个)
+                if (typeof window.okxwallet.enable === 'function') {
+                    log('测试 enable() 方法...');
+                    try {
+                        const result = await window.okxwallet.enable();
+                        log('✅ enable() 成功:', result);
+                    } catch (e) {
+                        error('enable() 失败:', e.message);
+                    }
+                }
+
+                // 测试连接状态
+                if (typeof window.okxwallet.isConnected === 'function') {
+                    log('测试 isConnected()...');
+                    try {
+                        const connected = await window.okxwallet.isConnected();
+                        log('✅ isConnected():', connected);
+                    } catch (e) {
+                        error('isConnected() 失败:', e.message);
+                    }
+                }
+
+            } catch (e) {
+                error('OKX启用测试失败:', e.message);
+            }
+        }
+
+        async function testOKXAlternativeMethods() {
+            log('=== OKX备用连接方法测试 ===');
+
+            try {
+                if (!window.okxwallet) {
+                    error('window.okxwallet 不存在');
+                    return;
+                }
+
+                // 方法1: 直接调用 enable (如果有)
+                if (typeof window.okxwallet.enable === 'function') {
+                    log('方法1: 测试 enable()...');
+                    try {
+                        const result = await window.okxwallet.enable();
+                        log('✅ enable() 成功:', result);
+
+                        // enable成功后，尝试标准RPC
+                        log('enable后测试 eth_chainId...');
+                        const chainId = await window.okxwallet.request({ method: 'eth_chainId' });
+                        log('✅ enable后 eth_chainId 成功:', chainId);
+
+                        return; // 如果这个方法成功，就不测试其他方法了
+                    } catch (e) {
+                        error('enable() 方法失败:', e.message);
+                    }
+                }
+
+                // 方法2: 使用 eth_accounts 而不是 eth_requestAccounts
+                log('方法2: 测试 eth_accounts...');
+                try {
+                    const accounts = await window.okxwallet.request({ method: 'eth_accounts' });
+                    log('✅ eth_accounts 成功:', accounts);
+
+                    if (accounts.length > 0) {
+                        log('✅ 钱包已授权，可以使用现有账户');
+                    } else {
+                        log('⚠️ 钱包未授权，需要 eth_requestAccounts');
+                    }
+                } catch (e) {
+                    error('eth_accounts 失败:', e.message);
+                }
+
+                // 方法3: 测试 personal_sign 来触发连接
+                log('方法3: 测试 personal_sign 触发连接...');
+                try {
+                    const testMessage = 'OKX Wallet connection test';
+                    const testAddress = '0x0000000000000000000000000000000000000000';
+
+                    await window.okxwallet.request({
+                        method: 'personal_sign',
+                        params: [testMessage, testAddress]
+                    });
+                } catch (e) {
+                    log('personal_sign 预期失败 (需要先连接):', e.message);
+                }
+
+                // 方法4: 检查是否有OKX特定的初始化方法
+                const okxSpecificMethods = ['okx_getProvider', 'okx_requestAccounts', 'okx_enable'];
+                for (const method of okxSpecificMethods) {
+                    if (typeof window.okxwallet[method] === 'function') {
+                        log(`发现OKX特定方法 ${method}，测试中...`);
+                        try {
+                            const result = await window.okxwallet[method]();
+                            log(`✅ ${method} 成功:`, result);
+                        } catch (e) {
+                            error(`${method} 失败:`, e.message);
+                        }
+                    }
+                }
+
+                // 方法5: 检查provider事件监听
+                log('方法5: 设置事件监听器...');
+                try {
+                    window.okxwallet.on('connect', (connectInfo) => {
+                        log('✅ 收到 connect 事件:', connectInfo);
+                    });
+
+                    window.okxwallet.on('accountsChanged', (accounts) => {
+                        log('✅ 收到 accountsChanged 事件:', accounts);
+                    });
+
+                    window.okxwallet.on('chainChanged', (chainId) => {
+                        log('✅ 收到 chainChanged 事件:', chainId);
+                    });
+
+                    log('✅ 事件监听器已设置');
+                } catch (e) {
+                    error('设置事件监听器失败:', e.message);
+                }
+
+            } catch (e) {
+                error('OKX备用连接方法测试失败:', e.message);
+            }
+        }
+
+        async function testOKXChainIdFirst() {
+            log('=== OKX先测试链ID再连接 ===');
+
+            try {
+                if (!window.okxwallet) {
+                    error('window.okxwallet 不存在');
+                    return;
+                }
+
+                // 先测试最基本的RPC方法
+                log('步骤1: 测试 eth_chainId...');
+                try {
+                    const chainId = await window.okxwallet.request({ method: 'eth_chainId' });
+                    log('✅ eth_chainId 成功:', chainId);
+                } catch (e) {
+                    error('eth_chainId 失败:', e.message);
+                    return;
+                }
+
+                // 再测试其他基本信息
+                log('步骤2: 测试 net_version...');
+                try {
+                    const netVersion = await window.okxwallet.request({ method: 'net_version' });
+                    log('✅ net_version 成功:', netVersion);
+                } catch (e) {
+                    error('net_version 失败:', e.message);
+                }
+
+                // 检查是否已连接账户
+                log('步骤3: 检查现有账户...');
+                try {
+                    const accounts = await window.okxwallet.request({ method: 'eth_accounts' });
+                    log('✅ eth_accounts 成功:', accounts);
+
+                    if (accounts.length > 0) {
+                        log('✅ 已有授权账户，无需重新连接');
+                        return;
+                    }
+                } catch (e) {
+                    error('eth_accounts 失败:', e.message);
+                }
+
+                // 最后尝试连接
+                log('步骤4: 请求连接...');
+                try {
+                    const accounts = await Promise.race([
+                        window.okxwallet.request({ method: 'eth_requestAccounts' }),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('60秒超时')), 60000))
+                    ]);
+                    log('✅ eth_requestAccounts 成功:', accounts);
+                } catch (e) {
+                    error('eth_requestAccounts 失败:', e.message);
+                }
+
+            } catch (e) {
+                error('OKX链ID优先测试失败:', e.message);
+            }
+        }
+
+        async function testOKXNoTimeout() {
+            log('=== OKX连接测试 (无超时限制) ===');
+
+            try {
+                const provider = window.okxwallet;
+
+                if (!provider) {
+                    error('window.okxwallet 不存在');
+                    return;
+                }
+
+                log('使用 window.okxwallet (无超时)');
+
+                log('测试 eth_chainId...');
+                try {
+                    const chainId = await provider.request({ method: 'eth_chainId' });
+                    log('✅ eth_chainId 成功:', chainId);
+                } catch (e) {
+                    error('eth_chainId 失败:', e.message);
+                }
+
+                log('测试 eth_requestAccounts (无超时限制)...');
+                log('⚠️ 注意: 如果OKX Wallet没有响应，这个测试可能会一直等待');
+                log('💡 请手动在浏览器中检查是否有OKX Wallet的连接弹窗');
+
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                log('✅ eth_requestAccounts 成功 (无超时):', accounts);
+
+            } catch (e) {
+                error('OKX连接测试失败 (无超时):', e.message);
+            }
+        }
+
+        async function testMetaMaskConnection() {
+            log('=== MetaMask连接测试 ===');
+
+            try {
+                const provider = window.ethereum;
+
+                if (!provider || !provider.isMetaMask) {
+                    error('MetaMask不存在或不是当前提供者');
+                    return;
+                }
+
+                log('使用MetaMask Provider');
+
+                const accounts = await Promise.race([
+                    provider.request({ method: 'eth_requestAccounts' }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('30秒超时')), 30000))
+                ]);
+
+                log('✅ MetaMask连接成功:', accounts);
+
+            } catch (e) {
+                error('MetaMask连接测试失败:', e.message);
+            }
+        }
+
+        async function testForceOKXPopup() {
+            log('=== 强制测试OKX弹窗 ===');
+
+            // 1. 首先检查OKX是否安装
+            if (!window.okxwallet && !window.ethereum?.isOkxWallet) {
+                error('❌ OKX钱包未安装！请先安装OKX钱包浏览器插件');
+                error('📥 下载地址: https://www.okx.com/web3');
+                return;
+            }
+
+            // 2. 确定使用哪个provider
+            let provider = null;
+            let providerName = '';
+
+            if (window.okxwallet && typeof window.okxwallet.request === 'function') {
+                provider = window.okxwallet;
+                providerName = 'window.okxwallet';
+                log('✅ 使用 window.okxwallet');
+            } else if (window.ethereum?.isOkxWallet && typeof window.ethereum.request === 'function') {
+                provider = window.ethereum;
+                providerName = 'window.ethereum (OKX)';
+                log('✅ 使用 window.ethereum (isOkxWallet)');
+            } else {
+                error('❌ 找不到有效的OKX provider');
+                return;
+            }
+
+            // 3. 测试基本RPC调用
+            log(`🔍 测试 ${providerName} 的基本功能...`);
+            try {
+                const chainId = await provider.request({ method: 'eth_chainId' });
+                log('✅ eth_chainId 成功:', chainId);
+            } catch (e) {
+                error('❌ eth_chainId 失败，provider可能有问题:', e.message);
+                return;
+            }
+
+            // 4. 强制触发连接请求
+            log('🚀 强制发送连接请求...');
+            log('⚠️ 注意观察浏览器是否出现OKX钱包的连接弹窗');
+
+            try {
+                const accounts = await provider.request({
+                    method: 'eth_requestAccounts'
+                });
+                log('✅ 连接成功！返回的账户:', accounts);
+            } catch (error) {
+                const msg = error.message || error.toString();
+
+                if (msg.includes('User rejected') || msg.includes('User denied') || msg.includes('用户拒绝')) {
+                    log('ℹ️ 用户拒绝了连接请求（这是正常的）');
+                } else if (msg.includes('Already processing')) {
+                    log('⚠️ 钱包正在处理其他请求，请稍后重试');
+                } else {
+                    error('❌ 连接失败:', msg);
+                }
+            }
+        }
+
+        async function testWalletSDKDetection() {
+            log('=== WalletSDK检测测试 ===');
+
+            try {
+                // 导入WalletSDK (这在实际使用中会通过ES模块导入)
+                log('ℹ️ 注意: 这个测试模拟WalletSDK的检测逻辑');
+
+                // 模拟EIP-6963检测
+                await testEIP6963Detection();
+
+            } catch (error) {
+                error('WalletSDK检测失败:', error.message);
+            }
+        }
+
+        async function testEIP6963Detection() {
+            log('=== EIP-6963 标准检测 ===');
+
+            const announceEvent = 'eip6963:announceProvider';
+            const requestEvent = 'eip6963:requestProvider';
+
+            // 收集检测到的钱包
+            const detectedWallets = [];
+
+            const handleAnnounce = (event) => {
+                const detail = event.detail;
+                log('📡 收到EIP-6963钱包公告:', {
+                    name: detail.info.name,
+                    rdns: detail.info.rdns,
+                    uuid: detail.info.uuid,
+                    hasProvider: !!detail.provider,
+                    hasRequest: typeof detail.provider?.request === 'function'
+                });
+
+                detectedWallets.push(detail);
+            };
+
+            // 监听公告事件
+            window.addEventListener(announceEvent, handleAnnounce);
+
+            try {
+                // 发送请求事件
+                log('📤 发送EIP-6963请求事件...');
+                window.dispatchEvent(new Event(requestEvent));
+
+                // 等待钱包响应
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                if (detectedWallets.length === 0) {
+                    log('⚠️ 没有检测到支持EIP-6963的钱包');
+                    log('💡 这可能意味着:');
+                    log('   - 钱包不支持EIP-6963标准');
+                    log('   - 钱包需要通过Legacy方式检测');
+                    log('   - 钱包还未完全加载');
+                } else {
+                    log(`✅ 检测到 ${detectedWallets.length} 个EIP-6963钱包:`);
+                    detectedWallets.forEach((wallet, index) => {
+                        log(`   ${index + 1}. ${wallet.info.name} (${wallet.info.rdns})`);
+                    });
+
+                    // 尝试连接OKX钱包
+                    const okxWallet = detectedWallets.find(w =>
+                        w.info.rdns.includes('okx') ||
+                        w.info.name.toLowerCase().includes('okx')
+                    );
+
+                    if (okxWallet) {
+                        log('🎯 找到OKX钱包，尝试连接...');
+                        try {
+                            const accounts = await okxWallet.provider.request({
+                                method: 'eth_requestAccounts'
+                            });
+                            log('✅ OKX连接成功:', accounts);
+                        } catch (e) {
+                            log('❌ OKX连接失败:', e.message);
+                        }
+                    }
+                }
+
+            } finally {
+                // 清理事件监听器
+                window.removeEventListener(announceEvent, handleAnnounce);
+            }
+        }
+
+        async function diagnoseOKXIssue() {
+            log('=== 🔍 OKX钱包问题诊断 ===');
+
+            if (!window.okxwallet) {
+                error('❌ window.okxwallet 不存在，OKX钱包未安装');
+                return;
+            }
+
+            // 1. 基本信息检查
+            log('1️⃣ 基本信息检查...');
+            log('Provider类型:', typeof window.okxwallet);
+            log('构造函数:', window.okxwallet.constructor?.name || 'unknown');
+            log('可用方法:', Object.getOwnPropertyNames(window.okxwallet).filter(n => typeof window.okxwallet[n] === 'function'));
+
+            // 2. 检查必要方法
+            log('2️⃣ 方法可用性检查...');
+            const methods = ['request', 'send', 'sendAsync', 'disconnect', 'enable'];
+            methods.forEach(method => {
+                const available = typeof window.okxwallet[method] === 'function';
+                log(`   ${method}: ${available ? '✅' : '❌'}`);
+            });
+
+            // 3. 测试基础RPC
+            log('3️⃣ 基础RPC测试...');
+            try {
+                // 测试简单的RPC调用
+                const chainId = await window.okxwallet.request({ method: 'eth_chainId' });
+                log('✅ eth_chainId 成功:', chainId);
+
+                const netVersion = await window.okxwallet.request({ method: 'net_version' });
+                log('✅ net_version 成功:', netVersion);
+            } catch (e) {
+                error('❌ 基础RPC失败:', e.message);
+            }
+
+            // 4. 检查当前连接状态
+            log('4️⃣ 连接状态检查...');
+            try {
+                const accounts = await window.okxwallet.request({ method: 'eth_accounts' });
+                if (accounts && accounts.length > 0) {
+                    log('✅ 已连接账户:', accounts);
+                } else {
+                    log('⚠️ 未连接任何账户');
+                }
+            } catch (e) {
+                log('⚠️ 无法获取账户状态:', e.message);
+            }
+
+            // 5. 检查权限
+            log('5️⃣ 权限检查...');
+            try {
+                if (typeof window.okxwallet.request === 'function') {
+                    // 尝试获取权限信息
+                    const permissions = await window.okxwallet.request({
+                        method: 'wallet_getPermissions'
+                    });
+                    log('✅ 当前权限:', permissions);
+                } else {
+                    log('⚠️ 无法检查权限');
+                }
+            } catch (e) {
+                log('⚠️ 权限检查失败:', e.message);
+            }
+
+            // 6. 浏览器环境检查
+            log('6️⃣ 浏览器环境检查...');
+            log('User Agent:', navigator.userAgent);
+            log('是否HTTPS:', location.protocol === 'https:');
+            log('是否本地环境:', location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+
+            // 7. 弹窗测试建议
+            log('7️⃣ 建议的解决方案:');
+            log('💡 请检查以下项目:');
+            log('   1. OKX钱包是否处于锁定状态？');
+            log('   2. 浏览器是否阻止了弹窗？');
+            log('   3. OKX钱包是否在后台运行？');
+            log('   4. 是否有其他钱包插件冲突？');
+            log('   5. 尝试手动点击OKX插件图标激活');
+
+            // 8. 重新尝试连接（更短超时）
+            log('8️⃣ 重新尝试连接（5秒超时）...');
+            try {
+                const accounts = await Promise.race([
+                    window.okxwallet.request({ method: 'eth_requestAccounts' }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('5秒超时')), 5000))
+                ]);
+                log('✅ 短超时连接成功:', accounts);
+            } catch (e) {
+                error('❌ 短超时连接失败:', e.message);
+
+                if (e.message.includes('5秒超时')) {
+                    log('💡 建议: 钱包可能需要手动激活');
+                    log('🔧 解决方案:');
+                    log('   1. 点击浏览器地址栏右侧的OKX插件图标');
+                    log('   2. 确保钱包已解锁');
+                    log('   3. 关闭可能阻止弹窗的浏览器设置');
+                    log('   4. 刷新页面后重试');
+                }
+            }
+        }
+
+        async function testDirectConnection() {
+            log('=== 🚀 直接连接测试（跳过所有预检查）===');
+
+            if (!window.okxwallet) {
+                error('❌ window.okxwallet 不存在');
+                return;
+            }
+
+            try {
+                log('🎯 直接发送连接请求，无任何预检查...');
+                log('⚠️ 请注意观察浏览器是否弹出OKX钱包授权窗口');
+
+                // 直接连接，不做任何预检查
+                const accounts = await window.okxwallet.request({
+                    method: 'eth_requestAccounts'
+                });
+
+                log('🎉 连接成功！账户:', accounts);
+
+                // 如果连接成功，再尝试获取其他信息
+                try {
+                    const chainId = await window.okxwallet.request({ method: 'eth_chainId' });
+                    log('✅ 链ID:', chainId);
+                } catch (e) {
+                    log('⚠️ 获取链ID失败，但连接已成功:', e.message);
+                }
+
+            } catch (error) {
+                const msg = error.message || error.toString();
+
+                if (msg.includes('User rejected') || msg.includes('User denied') || msg.includes('用户拒绝')) {
+                    log('ℹ️ 用户拒绝了连接请求（这是正常的）');
+                    log('💡 说明钱包弹窗功能正常，只是用户选择了拒绝');
+                } else if (msg.includes('Already processing')) {
+                    log('⚠️ 钱包正在处理其他请求');
+                    log('💡 建议：等待几秒后重试，或重启OKX钱包');
+                } else {
+                    error('❌ 直接连接失败:', msg);
+
+                    // 提供具体的解决建议
+                    if (msg.includes('timeout') || msg.includes('超时')) {
+                        log('💡 超时问题解决建议:');
+                        log('   1. 检查OKX钱包是否处于锁定状态');
+                        log('   2. 点击浏览器右上角的OKX插件图标');
+                        log('   3. 确保OKX钱包已解锁并处于活跃状态');
+                        log('   4. 检查浏览器是否阻止了弹窗');
+                    } else {
+                        log('💡 其他问题解决建议:');
+                        log('   1. 重启OKX钱包插件');
+                        log('   2. 刷新当前页面');
+                        log('   3. 检查是否有其他钱包插件冲突');
+                    }
+                }
+            }
+        }
+
+        // 页面加载时自动检测
+        window.addEventListener('load', () => {
+            log('🚀 OKX Debug页面已加载');
+            log('💡 推荐测试顺序:');
+            log('   1. 检测钱包 (EIP-6963优先)');
+            log('   2. 测试WalletSDK检测');
+            log('   3. 强制测试OKX弹窗');
+
+            // 自动开始检测
+            detectProviders();
+        });
+    </script>
+</body>
+</html>

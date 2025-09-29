@@ -3,3 +3,6 @@ export * from './components/Button';
 export * from './components/Card';
 export * from './components/Input';
 export * from './components/Badge';
+
+// 导出钱包 SDK
+export * from './wallet-sdk';

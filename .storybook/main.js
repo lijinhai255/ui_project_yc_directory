@@ -2,7 +2,9 @@ import { resolve } from 'path';
 
 const config = {
   // 修改为正确的故事文件路径
-  stories: ['../stories/**/*.stories.@(js|jsx|ts|tsx)'],
+  stories: [
+    '../stories/**/*.stories.@(js|jsx|ts|tsx)'
+  ],
   addons: [
     '@storybook/addon-links',
     '@storybook/addon-essentials',

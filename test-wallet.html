@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet SDK Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            color: #555;
+            margin-top: 0;
+        }
+        .wallet-status {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .status-label {
+            font-weight: 500;
+            color: #666;
+        }
+        .status-value {
+            color: #333;
+        }
+        .connected {
+            color: #28a745;
+        }
+        .disconnected {
+            color: #dc3545;
+        }
+        .connect-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .connect-button:hover {
+            background: #0056b3;
+        }
+        .connect-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .logs {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .clear-logs {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Mock the wallet SDK components for testing
+        const WalletContext = React.createContext();
+
+        const useWallet = () => {
+            const context = React.useContext(WalletContext);
+            if (!context) {
+                throw new Error('useWallet must be used within a WalletProvider');
+            }
+            return context;
+        };
+
+        const WalletProvider = ({ children, config }) => {
+            const [isConnected, setIsConnected] = useState(false);
+            const [address, setAddress] = useState(null);
+            const [chainId, setChainId] = useState(null);
+            const [isConnecting, setIsConnecting] = useState(false);
+            const [error, setError] = useState(null);
+            const [logs, setLogs] = useState([]);
+            const [availableWallets, setAvailableWallets] = useState([]);
+
+            const addLog = (message) => {
+                const timestamp = new Date().toLocaleTimeString();
+                setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+                console.log(`[WalletSDK] ${message}`);
+            };
+
+            const detectWallets = () => {
+                addLog('开始检测钱包...');
+                const wallets = [];
+
+                // Check for MetaMask
+                if (window.ethereum && window.ethereum.isMetaMask) {
+                    wallets.push({ id: 'metamask', name: 'MetaMask', installed: true });
+                    addLog('✅ 检测到 MetaMask');
+                }
+
+                // Check for OKX
+                if (window.okxwallet || (window.ethereum && window.ethereum.isOkxWallet)) {
+                    wallets.push({ id: 'okx', name: 'OKX Wallet', installed: true });
+                    addLog('✅ 检测到 OKX Wallet');
+                }
+
+                setAvailableWallets(wallets);
+                addLog(`检测完成，找到 ${wallets.length} 个钱包`);
+            };
+
+            const connectWallet = async (walletId) => {
+                addLog(`🚀 开始连接钱包: ${walletId}`);
+                setIsConnecting(true);
+                setError(null);
+
+                try {
+                    let provider;
+
+                    if (walletId === 'metamask' && window.ethereum) {
+                        provider = window.ethereum;
+                    } else if (walletId === 'okx' && window.okxwallet) {
+                        provider = window.okxwallet;
+                    } else if (walletId === 'okx' && window.ethereum && window.ethereum.isOkxWallet) {
+                        provider = window.ethereum;
+                    } else {
+                        throw new Error(`钱包 ${walletId} 未找到`);
+                    }
+
+                    addLog('🔄 正在请求账户访问...');
+                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
+
+                    if (!accounts || accounts.length === 0) {
+                        throw new Error('钱包未返回任何账户');
+                    }
+
+                    const address = accounts[0];
+                    const chainId = await provider.request({ method: 'eth_chainId' });
+
+                    addLog(`✅ 连接成功: ${address}`);
+                    setAddress(address);
+                    setChainId(chainId);
+                    setIsConnected(true);
+
+                    return {
+                        success: true,
+                        address,
+                        chainId: parseInt(chainId, 16),
+                        wallet: { id: walletId, name: walletId }
+                    };
+                } catch (error) {
+                    const errorMessage = error.message || '连接失败';
+                    addLog(`❌ 连接失败: ${errorMessage}`);
+                    setError(errorMessage);
+                    return { success: false, error: errorMessage };
+                } finally {
+                    setIsConnecting(false);
+                }
+            };
+
+            const disconnectWallet = () => {
+                addLog('🔌 断开连接');
+                setAddress(null);
+                setChainId(null);
+                setIsConnected(false);
+                setError(null);
+            };
+
+            useEffect(() => {
+                detectWallets();
+            }, []);
+
+            const value = {
+                isConnected,
+                address,
+                chainId,
+                isConnecting,
+                error,
+                connectWallet,
+                disconnectWallet,
+                getAvailableWallets: () => availableWallets,
+                logs
+            };
+
+            return (
+                <WalletContext.Provider value={value}>
+                    {children}
+                </WalletContext.Provider>
+            );
+        };
+
+        const ConnectButton = ({ onConnect, onDisconnect, label = '连接钱包' }) => {
+            const { isConnected, address, isConnecting, connectWallet, disconnectWallet } = useWallet();
+
+            const handleClick = async () => {
+                if (isConnected) {
+                    disconnectWallet();
+                    if (onDisconnect) onDisconnect();
+                } else {
+                    const result = await connectWallet('metamask');
+                    if (onConnect) onConnect(result);
+                }
+            };
+
+            return (
+                <button
+                    onClick={handleClick}
+                    disabled={isConnecting}
+                    className="connect-button"
+                >
+                    {isConnecting ? '连接中...' : isConnected ? `${address.slice(0, 6)}...${address.slice(-4)}` : label}
+                </button>
+            );
+        };
+
+        const TestApp = () => {
+            const [logs, setLogs] = useState([]);
+
+            const addLog = (message) => {
+                const timestamp = new Date().toLocaleTimeString();
+                setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+            };
+
+            const handleConnect = (result) => {
+                addLog(`连接回调: ${JSON.stringify(result)}`);
+            };
+
+            const handleDisconnect = () => {
+                addLog('断开连接回调');
+            };
+
+            const clearLogs = () => {
+                setLogs([]);
+            };
+
+            const walletConfig = {
+                appName: 'Wallet SDK Test',
+                projectId: 'test-project-id',
+                autoConnect: false,
+            };
+
+            return (
+                <WalletProvider config={walletConfig}>
+                    <div className="test-container">
+                        <div className="test-header">
+                            <h1>🚀 Wallet SDK 连接测试</h1>
+                            <p>测试钱包连接功能是否正常工作</p>
+                        </div>
+
+                        <div className="test-section">
+                            <h3>📊 钱包状态</h3>
+                            <WalletStatus />
+                        </div>
+
+                        <div className="test-section">
+                            <h3>🔗 连接测试</h3>
+                            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                                <ConnectButton
+                                    label="🔗 测试钱包连接"
+                                    onConnect={handleConnect}
+                                    onDisconnect={handleDisconnect}
+                                />
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#666', textAlign: 'center' }}>
+                                点击按钮测试钱包连接功能
+                            </div>
+                        </div>
+
+                        <div className="test-section">
+                            <h3>📋 调试日志</h3>
+                            <button className="clear-logs" onClick={clearLogs}>
+                                清空日志
+                            </button>
+                            <div className="logs">
+                                {logs.length === 0 ? '等待日志输出...' : logs.join('\n')}
+                            </div>
+                        </div>
+
+                        <div className="test-section">
+                            <h3>💡 测试说明</h3>
+                            <ol style={{ paddingLeft: '20px', color: '#666' }}>
+                                <li>确保已安装钱包扩展程序（如MetaMask）</li>
+                                <li>点击"测试钱包连接"按钮</li>
+                                <li>观察钱包状态变化</li>
+                                <li>查看调试日志了解连接过程</li>
+                                <li>检查浏览器控制台获取更详细信息</li>
+                            </ol>
+                        </div>
+                    </div>
+                </WalletProvider>
+            );
+        };
+
+        const WalletStatus = () => {
+            const { isConnected, address, chainId, isConnecting, error, getAvailableWallets } = useWallet();
+            const availableWallets = getAvailableWallets();
+
+            return (
+                <div className="wallet-status">
+                    <div className="status-item">
+                        <span className="status-label">连接状态:</span>
+                        <span className={`status-value ${isConnected ? 'connected' : 'disconnected'}`}>
+                            {isConnected ? '已连接' : '未连接'}
+                        </span>
+                    </div>
+                    <div className="status-item">
+                        <span className="status-label">钱包地址:</span>
+                        <span className="status-value">
+                            {address ? `${address.slice(0, 10)}...${address.slice(-8)}` : '无'}
+                        </span>
+                    </div>
+                    <div className="status-item">
+                        <span className="status-label">链ID:</span>
+                        <span className="status-value">{chainId || '无'}</span>
+                    </div>
+                    <div className="status-item">
+                        <span className="status-label">连接状态:</span>
+                        <span className="status-value">{isConnecting ? '连接中...' : '空闲'}</span>
+                    </div>
+                    <div className="status-item">
+                        <span className="status-label">可用钱包:</span>
+                        <span className="status-value">
+                            {availableWallets.length > 0 ? availableWallets.map(w => w.name).join(', ') : '无'}
+                        </span>
+                    </div>
+                    {error && (
+                        <div className="status-item">
+                            <span className="status-label">错误信息:</span>
+                            <span className="status-value" style={{ color: '#dc3545' }}>{error}</span>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.render(<TestApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
