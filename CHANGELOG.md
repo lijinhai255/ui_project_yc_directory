@@ -81,6 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-This is the initial release of @ycdirectory/ui, providing a complete solution for React applications that need modern UI components with integrated Web3 wallet functionality. The library is designed to be lightweight, type-safe, and easy to integrate into existing projects.
+This is the initial release of ycdirectory-ui, providing a complete solution for React applications that need modern UI components with integrated Web3 wallet functionality. The library is designed to be lightweight, type-safe, and easy to integrate into existing projects.
 
 For detailed usage instructions and examples, see the [README.md](./README.md) file.

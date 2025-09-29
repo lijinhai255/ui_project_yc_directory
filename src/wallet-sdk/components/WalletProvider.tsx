@@ -114,7 +114,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
         // 使用传入的配置或默认配置
         const walletConfig = {
-          appName: config.appName,
           projectId: config.projectId,
           chains: chains || config.chains || [],
           storage: config.storage || (typeof window !== 'undefined' ? window.localStorage : undefined),
@@ -431,7 +430,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
         // 触发链变化事件
         if (walletManager) {
-          walletManager.emit?.('chainChanged', { chainId });
+          (walletManager as any).emit?.('chainChanged', { chainId });
         }
 
       } catch (switchError: any) {

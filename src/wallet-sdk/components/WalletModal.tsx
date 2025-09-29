@@ -113,7 +113,7 @@ const WalletModal: React.FC<WalletModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className={`w-full max-w-xl mx-4 rounded-lg border ${classes.background} ${classes.border}`}>
+      <div className={`w-full max-w-2xl mx-4 rounded-lg border ${classes.background} ${classes.border}`}>
         {/* 头部 */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-4">
@@ -159,7 +159,9 @@ const WalletModal: React.FC<WalletModalProps> = ({
           ) : (
             <div className={isGridLayout ? 'grid grid-cols-2 gap-4' : 'space-y-3'}>
               {installedWallets.map((wallet) => {
-                const iconSrc = wallet.iconUrl || wallet.icon;
+                const iconSrc = typeof wallet.iconUrl === 'string'
+                  ? wallet.iconUrl
+                  : wallet.icon;
                 return (
                   <button
                     key={wallet.id}

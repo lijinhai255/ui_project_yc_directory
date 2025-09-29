@@ -160,6 +160,7 @@ export interface WalletState {
   wallet?: {
     id: string;
     name: string;
+    icon?: string;
     installed: boolean | undefined;
   };
   signer?: WalletSigner | ethers.Signer;

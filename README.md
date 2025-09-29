@@ -1,4 +1,4 @@
-# @ycdirectory/ui
+# ycdirectory-ui
 
 A modern React UI component library with built-in wallet connectivity. Built with TypeScript, Tailwind CSS, and comprehensive Web3 integration.
 
@@ -21,11 +21,11 @@ A modern React UI component library with built-in wallet connectivity. Built wit
 ## 📦 Installation
 
 ```bash
-npm install @ycdirectory/ui
+npm install ycdirectory-ui
 # or
-yarn add @ycdirectory/ui
+yarn add ycdirectory-ui
 # or
-pnpm add @ycdirectory/ui
+pnpm add ycdirectory-ui
 ```
 
 ## 🏁 Quick Start
@@ -33,8 +33,8 @@ pnpm add @ycdirectory/ui
 ### Basic Setup
 
 ```tsx
-import { WalletProvider, EnhancedConnectButton } from '@ycdirectory/ui';
-import '@ycdirectory/ui/dist/index.css'; // Import styles
+import { WalletProvider, EnhancedConnectButton } from 'ycdirectory-ui';
+import 'ycdirectory-ui/dist/index.css'; // Import styles
 
 function App() {
   return (
@@ -56,7 +56,7 @@ function App() {
 ### Custom Integration
 
 ```tsx
-import { Button, useWallet, WalletProvider } from '@ycdirectory/ui';
+import { Button, useWallet, WalletProvider } from 'ycdirectory-ui';
 
 function CustomWalletButton() {
   const {
@@ -95,7 +95,7 @@ function CustomWalletButton() {
 
 #### Button
 ```tsx
-import { Button } from '@ycdirectory/ui';
+import { Button } from 'ycdirectory-ui';
 
 <Button variant="primary" size="lg" onClick={handleClick}>
   Click me
@@ -110,7 +110,7 @@ import { Button } from '@ycdirectory/ui';
 
 #### Card
 ```tsx
-import { Card } from '@ycdirectory/ui';
+import { Card } from 'ycdirectory-ui';
 
 <Card className="p-6">
   <h3>Card Title</h3>
@@ -120,7 +120,7 @@ import { Card } from '@ycdirectory/ui';
 
 #### Input
 ```tsx
-import { Input } from '@ycdirectory/ui';
+import { Input } from 'ycdirectory-ui';
 
 <Input
   placeholder="Enter value"
@@ -131,7 +131,7 @@ import { Input } from '@ycdirectory/ui';
 
 #### Badge
 ```tsx
-import { Badge } from '@ycdirectory/ui';
+import { Badge } from 'ycdirectory-ui';
 
 <Badge variant="success">Active</Badge>
 ```
@@ -142,7 +142,7 @@ import { Badge } from '@ycdirectory/ui';
 The root provider that manages wallet state.
 
 ```tsx
-import { WalletProvider } from '@ycdirectory/ui';
+import { WalletProvider } from 'ycdirectory-ui';
 
 <WalletProvider
   config={{
@@ -160,7 +160,7 @@ import { WalletProvider } from '@ycdirectory/ui';
 A complete wallet connection button with built-in UI.
 
 ```tsx
-import { EnhancedConnectButton } from '@ycdirectory/ui';
+import { EnhancedConnectButton } from 'ycdirectory-ui';
 
 <EnhancedConnectButton
   showBalance={true}
@@ -176,7 +176,7 @@ import { EnhancedConnectButton } from '@ycdirectory/ui';
 A dropdown showing account info with actions.
 
 ```tsx
-import { AccountDropdown } from '@ycdirectory/ui';
+import { AccountDropdown } from 'ycdirectory-ui';
 
 <AccountDropdown
   showBalance={true}
@@ -191,7 +191,7 @@ import { AccountDropdown } from '@ycdirectory/ui';
 The main hook for wallet functionality.
 
 ```tsx
-import { useWallet } from '@ycdirectory/ui';
+import { useWallet } from 'ycdirectory-ui';
 
 const {
   // Connection state
@@ -286,14 +286,14 @@ npm install tailwindcss
 
 Or import the pre-built styles:
 ```tsx
-import '@ycdirectory/ui/dist/index.css';
+import 'ycdirectory-ui/dist/index.css';
 ```
 
 ## 📖 Advanced Usage
 
 ### Custom Wallet Modal
 ```tsx
-import { useWallet, WalletModal } from '@ycdirectory/ui';
+import { useWallet, WalletModal } from 'ycdirectory-ui';
 
 function CustomWalletFlow() {
   const {
