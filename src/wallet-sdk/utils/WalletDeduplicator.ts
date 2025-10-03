@@ -16,30 +16,12 @@ export class WalletDeduplicator {
     detected: DetectedWallet[] | undefined,
     configuredWallets: { [groupName: string]: ExtendedWalletInfo[] } | undefined
   ): DeduplicationResult {
-    console.log("🔍 开始钱包去重...", detected, configuredWallets);
 
     // 确保 detected 和 configuredWallets 是有效的
     const safeDetected = detected || [];
     const safeConfigured = configuredWallets || {};
 
-    console.log(
-      "检测到的钱包:",
-      safeDetected.length > 0
-        ? safeDetected.map((w) => ({ name: w.name, id: w.id, rdns: w.rdns }))
-        : "没有检测到钱包"
-    );
 
-    const nameMap = new Map<string, DetectedWallet>();
-    const rdnsMap = new Map<string, DetectedWallet>();
-
-    // 优先保留 EIP-6963 标准的钱包
-    const sortedDetected = [...safeDetected].sort((a, b) => {
-      if (a.type === "eip6963" && b.type !== "eip6963") return -1;
-      if (b.type === "eip6963" && a.type !== "eip6963") return 1;
-      return 0;
-    });
-
-    console.log("deduplicateDetectedWallets", sortedDetected, nameMap, rdnsMap);
 
     // 去重检测到的钱包
     const filteredDetected = this.deduplicateDetectedWallets(
@@ -54,9 +36,6 @@ export class WalletDeduplicator {
       filteredDetected
     );
 
-    console.log("✅ 去重完成");
-    console.log("最终检测钱包数量:", filteredDetected.length);
-    console.log("最终配置钱包组数:", Object.keys(staticFiltered).length);
 
     return {
       filtered: filteredDetected,
@@ -78,7 +57,6 @@ export class WalletDeduplicator {
     }
 
     if (sortedDetected.length === 0) {
-      console.log("⚠️ 没有检测到钱包，返回空结果");
       return filteredDetected;
     }
 
@@ -92,34 +70,6 @@ export class WalletDeduplicator {
         filteredDetected.push(wallet);
         nameMap.set(normalizedName, wallet);
         rdnsMap.set(wallet.rdns, wallet);
-        console.log(
-          `✅ 保留钱包: ${wallet.name} (${wallet.rdns}) [${wallet.type}]`
-        );
-      } else {
-        // 有重复，优先保留 EIP-6963 标准的
-        const existing = existingByName || existingByRdns;
-        if (
-          existing &&
-          wallet.type === "eip6963" &&
-          existing.type !== "eip6963"
-        ) {
-          // 替换为 EIP-6963 版本
-          const index = filteredDetected.findIndex(
-            (w) => w.rdns === existing.rdns
-          );
-          if (index !== -1) {
-            filteredDetected[index] = wallet;
-            nameMap.set(normalizedName, wallet);
-            rdnsMap.set(wallet.rdns, wallet);
-            console.log(
-              `🔄 替换钱包: ${existing.name} -> ${wallet.name} (更好的标准)`
-            );
-          }
-        } else {
-          console.log(
-            `❌ 跳过重复钱包: ${wallet.name} (${wallet.rdns}) [${wallet.type}]`
-          );
-        }
       }
     }
 
@@ -128,37 +78,17 @@ export class WalletDeduplicator {
 
   private static filterConfiguredWallets(
     configuredWallets: { [groupName: string]: ExtendedWalletInfo[] },
-    detectedWallets: DetectedWallet[]
+    filteredDetected: DetectedWallet[]
   ): { [groupName: string]: ExtendedWalletInfo[] } {
     const staticFiltered: { [groupName: string]: ExtendedWalletInfo[] } = {};
 
-    // 如果没有检测到钱包，直接返回原始配置
-    if (detectedWallets.length === 0) {
-      console.log("⚠️ 没有检测到钱包，返回原始配置钱包");
-      return configuredWallets;
-    }
-
-    const detectedNames = new Set(
-      detectedWallets.map((w) => w.name.toLowerCase().trim())
-    );
-    const detectedIds = new Set(
-      detectedWallets.map((w) => w.id.toLowerCase())
-    );
-
-    Object.entries(configuredWallets).forEach(([groupName, walletsInGroup]) => {
-      const filtered = walletsInGroup.filter((wallet) => {
-        const normalizedName = wallet.name.toLowerCase().trim();
-        const normalizedId = wallet.id.toLowerCase();
-
-        const isDuplicate =
-          detectedNames.has(normalizedName) || detectedIds.has(normalizedId);
-
-        if (isDuplicate) {
-          console.log(`🚫 过滤配置钱包: ${wallet.name} (与检测到的钱包重复)`);
-          return false;
-        }
-
-        return true;
+    Object.entries(configuredWallets).forEach(([groupName, wallets]) => {
+      const filtered = wallets.filter(wallet => {
+        const existsInDetected = filteredDetected.some(detected =>
+          detected.name.toLowerCase().trim() === wallet.name.toLowerCase().trim() ||
+          detected.rdns === wallet.rdns
+        );
+        return !existsInDetected;
       });
 
       if (filtered.length > 0) {

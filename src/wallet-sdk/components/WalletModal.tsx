@@ -20,35 +20,17 @@ const WalletModal: React.FC<WalletModalProps> = ({
   // 合并所有可用的钱包（WalletProvider已经处理了去重）
   const allWallets: ExtendedWalletInfo[] = [];
 
-  console.log('🔍 WalletModal - 开始处理钱包，详细调试信息:');
-  console.log('📋 walletInstances:', walletInstances);
-  console.log('📋 detectedWallets:', detectedWallets);
-
   // 添加配置的钱包实例（这些已经经过去重处理）
   Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
-    console.log(`  🏷️ 组名: ${groupName}, 钱包数量: ${walletGroup.length}`);
-    walletGroup.forEach(wallet => {
-      console.log(`    🪪 钱包: ${wallet.name} (${wallet.id}) - 已安装: ${wallet.installed}`);
-    });
     allWallets.push(...walletGroup);
   });
 
-  console.log('📦 WalletModal 合并后的所有钱包数量:', allWallets.length);
-  console.log('📦 WalletModal 合并后的所有钱包:', allWallets.map(w => ({name: w.name, id: w.id, installed: w.installed})));
-
   // 只显示已安装的钱包
   const installedWallets = allWallets.filter(wallet => wallet.installed);
-  console.log('📦 WalletModal 已安装钱包数量:', installedWallets.length);
-  console.log('📦 WalletModal 已安装钱包:', installedWallets.map(w => ({name: w.name, id: w.id, installed: w.installed})));
 
   const handleWalletSelect = async (walletId: string) => {
-    console.log('🚀 用户选择钱包:', walletId);
-    console.log('🔍 WalletModal - 开始连接钱包，详细信息:');
-    console.log('  🪪 钱包ID:', walletId);
-
     // 查找选中的钱包信息
     const selectedWallet = installedWallets.find(wallet => wallet.id === walletId);
-    console.log('  🔎 找到的钱包信息:', selectedWallet);
 
     if (!selectedWallet) {
       console.error('❌ 未找到选中的钱包:', walletId);
@@ -58,27 +40,17 @@ const WalletModal: React.FC<WalletModalProps> = ({
     setConnectingWallet(walletId);
 
     try {
-      console.log('  🔌 调用 onConnect，参数:', walletId);
       const result = await onConnect(walletId);
-      console.log('  ✅ onConnect 返回结果:', result);
 
       // 连接成功或失败后都关闭弹窗
       if (result.success) {
-        console.log('✅ 钱包连接成功，关闭弹窗');
-      } else {
-        console.log('❌ 钱包连接失败:', result.error);
+        // 连接成功
       }
 
       // 无论成功与否都关闭弹窗
       onClose();
     } catch (error) {
       console.error('❌ 连接钱包过程中发生错误:', error);
-      console.error('  📋 错误详情:', {
-        message: error instanceof Error ? error.message : '未知错误',
-        stack: error instanceof Error ? error.stack : undefined,
-        walletId,
-        selectedWallet: selectedWallet.name
-      });
       // 发生错误时也关闭弹窗
       onClose();
     } finally {

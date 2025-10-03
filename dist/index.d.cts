@@ -367,8 +367,10 @@ declare const WalletProvider: React$1.FC<WalletProviderProps>;
 declare const useWallet: () => WalletContextValue;
 
 declare const ConnectButton: React$1.FC<ConnectButtonProps>;
+//# sourceMappingURL=ConnectButton.d.ts.map
 
 declare const WalletModal: React$1.FC<WalletModalProps>;
+//# sourceMappingURL=WalletModal.d.ts.map
 
 interface AccountDropdownProps {
     className?: string;
@@ -378,6 +380,7 @@ interface AccountDropdownProps {
     onDisconnect?: () => void;
 }
 declare const AccountDropdown: React$1.FC<AccountDropdownProps>;
+//# sourceMappingURL=AccountDropdown.d.ts.map
 
 interface EnhancedConnectButtonProps {
     label?: string;
@@ -393,6 +396,7 @@ interface EnhancedConnectButtonProps {
     onDisconnect?: () => void;
 }
 declare const EnhancedConnectButton: React$1.FC<EnhancedConnectButtonProps>;
+//# sourceMappingURL=EnhancedConnectButton.d.ts.map
 
 declare const version = "0.1.0";
 

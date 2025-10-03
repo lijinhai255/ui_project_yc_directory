@@ -1,0 +1,1 @@
+{"version":3,"file":"SignerFactory.d.ts","sourceRoot":"","sources":["SignerFactory.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,gBAAgB,EAAE,YAAY,EAAE,MAAM,UAAU,CAAC;AAE1D,qBAAa,aAAa;IACxB;;;;;OAKG;IACH,MAAM,CAAC,kBAAkB,CAAC,QAAQ,EAAE,gBAAgB,EAAE,OAAO,EAAE,MAAM,GAAG,YAAY;IAuDpF;;;;OAIG;IACH,MAAM,CAAC,UAAU,CAAC,MAAM,EAAE,OAAO,GAAG,YAAY,GAAG,SAAS;CAoC7D"}

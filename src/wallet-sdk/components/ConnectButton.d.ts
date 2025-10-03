@@ -1,0 +1,5 @@
+import React from 'react';
+import { ConnectButtonProps } from '../types';
+declare const ConnectButton: React.FC<ConnectButtonProps>;
+export default ConnectButton;
+//# sourceMappingURL=ConnectButton.d.ts.map

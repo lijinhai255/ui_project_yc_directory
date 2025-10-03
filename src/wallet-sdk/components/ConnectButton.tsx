@@ -50,30 +50,17 @@ const ConnectButton: React.FC<ConnectButtonProps> = ({
 
   const handleConnect = async () => {
     try {
-      console.log('🔍 ConnectButton - 开始连接，详细调试信息:');
-      console.log('📋 walletInstances:', walletInstances);
-      console.log('📋 detectedWallets:', detectedWallets);
-
       // 使用已经去重的钱包实例（WalletProvider已处理去重）
       const allWallets: any[] = [];
 
       // 只使用钱包实例中的钱包（已去重）
       if (walletInstances) {
-        console.log('🔄 处理钱包实例组:');
         Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
-          console.log(`  🏷️ 组名: ${groupName}, 钱包数量: ${walletGroup.length}`);
-          walletGroup.forEach(wallet => {
-            console.log(`    🪪 钱包: ${wallet.name} (${wallet.id}) - 已安装: ${wallet.installed}`);
-          });
           allWallets.push(...walletGroup);
         });
       }
 
-      console.log('📦 合并后的所有钱包数量:', allWallets.length);
-      console.log('📦 合并后的所有钱包:', allWallets.map(w => ({name: w.name, id: w.id, installed: w.installed})));
-
       if (allWallets.length === 0) {
-        console.warn('没有找到可用的钱包，请安装钱包扩展程序');
         return;
       }
 
@@ -81,13 +68,11 @@ const ConnectButton: React.FC<ConnectButtonProps> = ({
       const installedWallets = allWallets.filter(wallet => wallet.installed);
 
       if (installedWallets.length === 0) {
-        console.warn('没有已安装的钱包，请先安装钱包扩展程序');
         return;
       }
 
       // 如果只有一个已安装的钱包，直接连接
       if (installedWallets.length === 1) {
-        console.log('🚀 开始连接钱包:', installedWallets[0].name);
         const result = await connect(installedWallets[0].id);
         if (onConnect) {
           onConnect(result);
@@ -99,33 +84,16 @@ const ConnectButton: React.FC<ConnectButtonProps> = ({
         }
       } else {
         // 多个已安装的钱包，打开选择弹窗
-        console.log('📱 打开钱包选择弹窗，可用的钱包:', installedWallets.map(w => w.name));
         openModal();
       }
     } catch (error) {
       console.error('❌ 连接钱包失败:', error);
-
-      // 错误处理：如果是用户拒绝，提供更友好的提示
-      if (error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (
-          errorMessage.includes('user rejected') ||
-          errorMessage.includes('user denied') ||
-          errorMessage.includes('user cancelled') ||
-          errorMessage.includes('拒绝') ||
-          errorMessage.includes('取消')
-        ) {
-          console.log('ℹ️ 用户拒绝了钱包授权请求');
-        }
-      }
     }
   };
 
   const handleDisconnect = async () => {
     try {
-      console.log('🔌 开始断开钱包连接');
       await disconnect();
-      console.log('✅ 钱包已断开连接');
 
       if (onDisconnect) {
         onDisconnect();

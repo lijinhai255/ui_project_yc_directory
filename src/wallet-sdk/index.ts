@@ -1,5 +1,6 @@
 // 核心管理器
 export { WalletManager } from './core/WalletManager';
+export { WalletSDK } from './core/WalletSDK';
 
 // React 组件
 export { WalletProvider, useWallet } from './components/WalletProvider';

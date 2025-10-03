@@ -30,6 +30,7 @@ import { Address, formatEther, formatUnits } from 'viem';
 const WalletContext = createContext<WalletContextValue>({
   address: "0x" as Address,
   chainId: null,
+  chainID: null,
   isConnecting: false,
   isConnected: false,
   isDisconnected: true,
@@ -72,6 +73,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
   const [state, setState] = useState<WalletState>({
     address: "0x" as Address,
     chainId: null,
+    chainID: null,
     isConnecting: false,
     isConnected: false,
     isDisconnected: true,
@@ -109,8 +111,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
   useEffect(() => {
     const initializeWalletManager = async () => {
       try {
-        console.log("🚀 初始化 WalletManager...");
-        const manager = new WalletManager();
+                const manager = new WalletManager();
 
         // 使用传入的配置或默认配置
         const walletConfig = {
@@ -126,7 +127,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
         // 设置事件监听
         manager.on('connect', (data) => {
-          console.log("🔗 钱包连接事件:", data);
           setState(prev => ({
             ...prev,
             isConnected: true,
@@ -134,6 +134,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
             isDisconnected: false,
             address: data.address as Address,
             chainId: data.chainId,
+            chainID: data.chainId?.toString() || null,
+            provider: data.provider,
             wallet: data.wallet ? {
               id: data.wallet.id || data.walletId,
               name: data.wallet.name || 'Unknown',
@@ -145,7 +147,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         });
 
         manager.on('disconnect', () => {
-          console.log("🔌 钱包断开事件");
           setState(prev => ({
             ...prev,
             isConnected: false,
@@ -153,6 +154,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
             isConnecting: false,
             address: "0x" as Address,
             chainId: null,
+            chainID: null,
+            provider: undefined,
             wallet: undefined,
             balance: "0.0000",
             signer: undefined,
@@ -162,15 +165,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         });
 
         manager.on('chainChanged', (data) => {
-          console.log("🔄 链变化事件:", data);
           setState(prev => ({
             ...prev,
             chainId: data.chainId,
+            chainID: data.chainId?.toString() || null,
           }));
         });
 
         manager.on('accountChanged', (data) => {
-          console.log("👤 账户变化事件:", data);
           setState(prev => ({
             ...prev,
             address: (data.accounts[0] || "0x") as Address,
@@ -186,8 +188,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
           }));
         });
 
-        console.log("✅ WalletManager 初始化完成");
-      } catch (error) {
+              } catch (error) {
         console.error('初始化 WalletManager 失败:', error);
         setState(prev => ({
           ...prev,
@@ -217,11 +218,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
       try {
         setWalletsLoading(true);
-        console.log("🔄 开始钱包检测...");
 
         // 检测可用钱包
         const detectedWallets = walletManager.getWallets();
-        console.log("📋 检测到的原始钱包:", detectedWallets);
 
         // 构建配置的钱包实例
         const configuredInstances: { [groupName: string]: ExtendedWalletInfo[] } = {};
@@ -247,9 +246,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
           configuredInstances
         );
 
-        console.log("🎯 去重后的检测钱包:", filteredDetected);
-        console.log("🎯 去重后的配置钱包:", staticFiltered);
-
+        
         setDetectedWallets(filteredDetected);
 
         // 构建最终的钱包实例
@@ -278,7 +275,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         });
 
         setWalletInstances(finalInstances);
-        console.log("📦 最终钱包实例:", finalInstances);
       } catch (error) {
         console.error("❌ 钱包检测失败:", error);
         setState(prev => ({
@@ -303,8 +299,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
       };
     }
 
-    console.log("🚀 WalletProvider - 开始连接钱包:", walletId);
-
+    
     setState(prev => ({
       ...prev,
       isConnecting: true,
@@ -313,10 +308,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     }));
 
     try {
-      console.log("  🔌 调用 walletManager.connectWallet...");
       const result = await walletManager.connectWallet(walletId);
 
-      console.log("✅ WalletProvider - 钱包连接成功:", result);
 
       // 状态会通过事件监听器自动更新
       setIsModalOpen(false);
@@ -332,6 +325,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         success: true,
         address: result.address,
         chainId: result.chainId,
+        chainID: result.chainId?.toString() || null,
         wallet: result.wallet,
         provider: result.provider,
       };
@@ -355,7 +349,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
   // 断开连接
   const disconnect = useCallback(async (): Promise<void> => {
-    console.log("🔌 开始断开钱包连接", { walletId: currentWalletId });
 
     try {
       // 调用 walletManager 的断开连接方法
@@ -372,7 +365,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
       config.storage.removeItem('lastConnectedWallet');
       config.storage.removeItem('walletAddress');
       config.storage.removeItem('lastConnectionTime');
-      console.log("🧹 已清理本地存储");
     }
 
     // 重置状态
@@ -382,6 +374,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
       isDisconnected: true,
       address: "0x" as Address,
       chainId: null,
+      chainID: null,
+      provider: undefined,
       wallet: undefined,
       signer: undefined,
       balance: "0.0000",
@@ -395,7 +389,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     // 清理代币余额缓存
     setTokenBalanceCache({});
 
-    console.log("✅ 钱包断开连接完成");
   }, [walletManager, currentWalletId, config.storage]);
 
   // 切换链
@@ -403,7 +396,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     if (!walletManager) throw new Error('WalletManager 未初始化');
 
     try {
-      console.log("🔄 切换链:", chainId);
 
       // 获取当前连接的钱包
       const currentWallet = walletManager.getWalletById(currentWalletId);
@@ -423,10 +415,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
           params: [{ chainId: chainIdHex }],
         });
 
-        console.log(`✅ 成功切换到链 ${chainId}`);
 
         // 更新状态
-        setState(prev => ({ ...prev, chainId }));
+        setState(prev => ({
+          ...prev,
+          chainId,
+          chainID: chainId.toString()
+        }));
 
         // 触发链变化事件
         if (walletManager) {
@@ -436,7 +431,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
       } catch (switchError: any) {
         // 如果链不存在，可能需要添加链
         if (switchError.code === 4902) {
-          console.log(`链 ${chainId} 不存在，尝试添加...`);
 
           // 获取链配置
           const chainConfig = getChainConfig(chainId);
@@ -446,8 +440,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
               params: [chainConfig],
             });
 
-            console.log(`✅ 成功添加并切换到链 ${chainId}`);
-            setState(prev => ({ ...prev, chainId }));
+            setState(prev => ({
+              ...prev,
+              chainId,
+              chainID: chainId.toString()
+            }));
           } else {
             throw new Error(`不支持的链 ID: ${chainId}`);
           }
@@ -517,17 +514,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
   // 获取余额
   const fetchBalance = useCallback(async (): Promise<void> => {
     if (!state.isConnected || !state.address) {
-      console.log("⚠️ 余额获取跳过 - 钱包未连接或地址为空", {
-        isConnected: state.isConnected,
-        address: state.address
-      });
       return;
     }
 
     try {
       setBalanceLoading(true);
-      console.log("💰 开始获取余额...", state.address);
-      console.log("🔍 当前 chainId:", state.chainId);
 
       // 获取当前连接的钱包
       const currentWallet = walletManager?.getWalletById(currentWalletId);
@@ -539,17 +530,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         return;
       }
 
-      console.log("🎯 找到当前钱包:", currentWallet.name);
       const provider = currentWallet.provider;
 
       // 使用 eth_getBalance 获取余额
-      console.log("📞 调用 eth_getBalance...");
       const balanceHex = await provider.request({
         method: 'eth_getBalance',
         params: [state.address, 'latest'],
       });
 
-      console.log("📋 余额原始响应:", { balanceHex, type: typeof balanceHex });
 
       if (typeof balanceHex === 'string') {
         // 将十六进制余额转换为 ETH
@@ -557,19 +545,12 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         const balanceEth = formatEther(balanceWei);
         const formattedBalance = parseFloat(balanceEth).toFixed(4);
 
-        console.log(`💰 余额计算详情:`, {
-          hex: balanceHex,
-          wei: balanceWei.toString(),
-          eth: balanceEth,
-          formatted: formattedBalance
-        });
-
+          
         setState(prev => ({
           ...prev,
           balance: formattedBalance,
         }));
 
-        console.log(`✅ 余额更新成功: ${formattedBalance} ETH`);
       } else {
         console.error("❌ 余额响应类型错误:", typeof balanceHex, balanceHex);
       }
@@ -762,7 +743,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         return;
       }
 
-      console.log("🔄 尝试自动连接:", lastConnectedWallet);
 
       try {
         // 检查该钱包是否还存在
@@ -772,7 +752,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         if (walletExists) {
           await connect(lastConnectedWallet);
         } else {
-          console.log("🔄 上次连接的钱包不存在，清理存储");
           if (typeof window !== 'undefined' && config.storage) {
             config.storage.removeItem('lastConnectedWallet');
             config.storage.removeItem('walletAddress');

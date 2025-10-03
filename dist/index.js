@@ -1,3 +1,20 @@
+var __typeError = (msg) => {
+  throw TypeError(msg);
+};
+var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
+var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
+var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
+var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
+var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
+var __privateWrapper = (obj, member, setter, getter) => ({
+  set _(value) {
+    __privateSet(obj, member, value, setter);
+  },
+  get _() {
+    return __privateGet(obj, member, getter);
+  }
+});
+
 // src/components/Button.tsx
 import { jsx, jsxs } from "react/jsx-runtime";
 var Button = ({
@@ -249,21 +266,16 @@ var WalletManager = class {
   }
   initialize() {
     if (this.initialized) {
-      console.log("\u{1F504} WalletManager \u5DF2\u7ECF\u521D\u59CB\u5316\uFF0C\u8FD4\u56DE\u73B0\u6709\u94B1\u5305");
       return this.getWallets();
     }
-    console.log("\u{1F680} \u521D\u59CB\u5316 WalletManager...");
     this.detectWallets();
     this.initialized = true;
-    console.log("\u2705 WalletManager \u521D\u59CB\u5316\u5B8C\u6210");
     return this.getWallets();
   }
   isInitialized() {
     return this.initialized;
   }
   async connectWallet(walletId) {
-    debugger;
-    console.log(`\u{1F50C} WalletManager \u8FDE\u63A5\u94B1\u5305: ${walletId}`);
     const wallet = this.getWalletById(walletId);
     if (!wallet) {
       throw new Error(`\u94B1\u5305 ${walletId} \u672A\u627E\u5230\u6216\u672A\u5B89\u88C5`);
@@ -274,7 +286,6 @@ var WalletManager = class {
     try {
       const connector = wallet.createConnector();
       const result = await connector.connect();
-      console.log(`\u{1F389} ${wallet.name} \u8FDE\u63A5\u5668\u8FD4\u56DE\u7ED3\u679C:`, result);
       if (!result.accounts || result.accounts.length === 0) {
         throw new Error("\u8FDE\u63A5\u5668\u672A\u8FD4\u56DE\u8D26\u6237\u4FE1\u606F");
       }
@@ -293,7 +304,6 @@ var WalletManager = class {
         provider,
         signer: SignerFactory.createFromProvider(provider, address)
       };
-      console.log(`\u2705 ${wallet.name} \u6700\u7EC8\u8FDE\u63A5\u7ED3\u679C:`, connectionResult);
       this.emit("connect", {
         address,
         chainId,
@@ -302,7 +312,8 @@ var WalletManager = class {
           id: wallet.id,
           name: wallet.name,
           installed: wallet.installed
-        }
+        },
+        provider
       });
       return connectionResult;
     } catch (error) {
@@ -312,27 +323,20 @@ var WalletManager = class {
     }
   }
   async disconnectWallet(walletId) {
-    console.log(`\u{1F50C} WalletManager \u65AD\u5F00\u94B1\u5305: ${walletId}`);
     if (!walletId) {
-      console.warn("\u26A0\uFE0F \u94B1\u5305ID\u4E3A\u7A7A\uFF0C\u8DF3\u8FC7\u65AD\u5F00\u8FDE\u63A5");
       return;
     }
     const wallet = this.getWalletById(walletId);
     if (!wallet) {
-      console.warn(`\u26A0\uFE0F \u94B1\u5305 ${walletId} \u672A\u627E\u5230\uFF0C\u8DF3\u8FC7\u65AD\u5F00\u8FDE\u63A5`);
       return;
     }
     if (!wallet.createConnector) {
-      console.warn(`\u26A0\uFE0F \u94B1\u5305 ${wallet.name} \u7F3A\u5C11\u8FDE\u63A5\u5668\uFF0C\u8DF3\u8FC7\u65AD\u5F00\u8FDE\u63A5`);
       return;
     }
     try {
       const connector = wallet.createConnector();
       if (connector.disconnect) {
         await connector.disconnect();
-        console.log(`\u2705 \u94B1\u5305 ${wallet.name} \u65AD\u5F00\u8FDE\u63A5\u6210\u529F`);
-      } else {
-        console.log(`\u2139\uFE0F \u94B1\u5305 ${wallet.name} \u4E0D\u652F\u6301\u7A0B\u5E8F\u5316\u65AD\u5F00\u8FDE\u63A5`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "\u672A\u77E5\u9519\u8BEF";
@@ -340,7 +344,6 @@ var WalletManager = class {
     }
   }
   async disconnectAll() {
-    console.log("\u{1F50C} WalletManager \u65AD\u5F00\u6240\u6709\u94B1\u5305\u8FDE\u63A5");
     const wallets = this.getWallets();
     const disconnectPromises = wallets.map(
       (wallet) => this.disconnectWallet(wallet.id).catch((error) => {
@@ -348,7 +351,6 @@ var WalletManager = class {
       })
     );
     await Promise.allSettled(disconnectPromises);
-    console.log("\u2705 \u6240\u6709\u94B1\u5305\u65AD\u5F00\u8FDE\u63A5\u5B8C\u6210");
   }
   async getChainIdSafe(provider) {
     try {
@@ -363,13 +365,10 @@ var WalletManager = class {
   }
   detectWallets() {
     if (typeof window === "undefined") {
-      console.log("\u26A0\uFE0F \u975E\u6D4F\u89C8\u5668\u73AF\u5883\uFF0C\u8DF3\u8FC7\u94B1\u5305\u68C0\u6D4B");
       return;
     }
-    console.log("\u{1F50D} \u5F00\u59CB\u68C0\u6D4B\u94B1\u5305...");
     this.detectEIP6963Wallets();
     this.detectLegacyWallets();
-    console.log(`\u{1F3AF} \u68C0\u6D4B\u5B8C\u6210\uFF0C\u627E\u5230 ${this.wallets.size} \u4E2A\u94B1\u5305`);
   }
   detectEIP6963Wallets() {
     const announceEvent = "eip6963:announceProvider";
@@ -386,7 +385,6 @@ var WalletManager = class {
     const windowEth = window;
     const ethereum = this.getEthereumProvider(windowEth);
     if (!ethereum) {
-      console.log("\u26A0\uFE0F \u672A\u627E\u5230 window.ethereum");
       return;
     }
     const provider = ethereum;
@@ -447,12 +445,10 @@ var WalletManager = class {
       type: "eip6963",
       createConnector: () => this.createStandardConnector(detail.provider, detail.info.name)
     };
-    console.log(`\u{1F50D} \u68C0\u6D4B\u5230\u94B1\u5305 (EIP-6963): ${wallet.name}`, wallet);
     this.wallets.set(wallet.id, wallet);
   }
   addLegacyWallet(id, name, provider) {
     if (this.wallets.has(id)) {
-      console.log(`\u26A0\uFE0F \u94B1\u5305 ${name} \u5DF2\u5B58\u5728\uFF0C\u8DF3\u8FC7`);
       return;
     }
     const wallet = {
@@ -465,26 +461,18 @@ var WalletManager = class {
       type: "legacy",
       createConnector: () => this.createStandardConnector(provider, name)
     };
-    console.log(`\u{1F50D} \u68C0\u6D4B\u5230\u94B1\u5305 (Legacy): ${wallet.name}`, wallet);
     this.wallets.set(wallet.id, wallet);
   }
   createStandardConnector(provider, walletName) {
-    console.log(`\u{1F50C} \u4E3A ${walletName} \u521B\u5EFA\u6807\u51C6\u8FDE\u63A5\u5668`);
     const connector = {
       id: "",
       name: walletName,
       provider,
       connect: async () => {
-        console.log(`\u{1F504} ${walletName} \u8FDE\u63A5\u4E2D...`);
-        console.log(`\u{1F50D} \u68C0\u67E5 provider:`, provider);
-        console.log(`\u{1F50D} Provider \u7C7B\u578B:`, typeof provider);
-        console.log(`\u{1F50D} Provider \u662F\u5426\u6709 request \u65B9\u6CD5:`, typeof provider.request);
         try {
-          debugger;
           const accounts = await provider.request({
             method: "eth_requestAccounts"
           });
-          console.log(`\u2705 ${walletName} \u8FDE\u63A5\u6210\u529F:`, accounts);
           const accountsArray = Array.isArray(accounts) ? accounts.filter((acc) => typeof acc === "string") : typeof accounts === "string" ? [accounts] : [];
           if (accountsArray.length === 0) {
             throw new Error("\u672A\u83B7\u53D6\u5230\u6709\u6548\u7684\u8D26\u6237\u5730\u5740");
@@ -503,14 +491,10 @@ var WalletManager = class {
         }
       },
       disconnect: async () => {
-        console.log(`\u{1F50C} ${walletName} \u8FDE\u63A5\u5668\u65AD\u5F00\u8FDE\u63A5`);
         try {
           const disconnectableProvider = provider;
           if (disconnectableProvider.disconnect && typeof disconnectableProvider.disconnect === "function") {
             await disconnectableProvider.disconnect();
-            console.log(`\u2705 ${walletName} provider \u65AD\u5F00\u6210\u529F`);
-          } else {
-            console.log(`\u2139\uFE0F ${walletName} \u4E0D\u652F\u6301\u7A0B\u5E8F\u5316\u65AD\u5F00\uFF0C\u9700\u8981\u7528\u6237\u624B\u52A8\u65AD\u5F00`);
           }
         } catch (error) {
           console.warn(`\u26A0\uFE0F ${walletName} \u65AD\u5F00\u8FDE\u63A5\u65F6\u51FA\u9519:`, error);
@@ -630,6 +614,2328 @@ var WalletManager = class {
   }
 };
 
+// src/wallet-sdk/wagmi.ts
+import { connectorsForWallets } from "@rainbow-me/rainbowkit";
+import {
+  metaMaskWallet,
+  trustWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  injectedWallet,
+  okxWallet,
+  safeWallet,
+  imTokenWallet
+} from "@rainbow-me/rainbowkit/wallets";
+import { http, createConfig, createStorage } from "wagmi";
+
+// ../../node_modules/@tanstack/query-core/build/modern/subscribable.js
+var Subscribable = class {
+  constructor() {
+    this.listeners = /* @__PURE__ */ new Set();
+    this.subscribe = this.subscribe.bind(this);
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    this.onSubscribe();
+    return () => {
+      this.listeners.delete(listener);
+      this.onUnsubscribe();
+    };
+  }
+  hasListeners() {
+    return this.listeners.size > 0;
+  }
+  onSubscribe() {
+  }
+  onUnsubscribe() {
+  }
+};
+
+// ../../node_modules/@tanstack/query-core/build/modern/timeoutManager.js
+var defaultTimeoutProvider = {
+  // We need the wrapper function syntax below instead of direct references to
+  // global setTimeout etc.
+  //
+  // BAD: `setTimeout: setTimeout`
+  // GOOD: `setTimeout: (cb, delay) => setTimeout(cb, delay)`
+  //
+  // If we use direct references here, then anything that wants to spy on or
+  // replace the global setTimeout (like tests) won't work since we'll already
+  // have a hard reference to the original implementation at the time when this
+  // file was imported.
+  setTimeout: (callback, delay) => setTimeout(callback, delay),
+  clearTimeout: (timeoutId) => clearTimeout(timeoutId),
+  setInterval: (callback, delay) => setInterval(callback, delay),
+  clearInterval: (intervalId) => clearInterval(intervalId)
+};
+var _provider, _providerCalled, _a;
+var TimeoutManager = (_a = class {
+  constructor() {
+    // We cannot have TimeoutManager<T> as we must instantiate it with a concrete
+    // type at app boot; and if we leave that type, then any new timer provider
+    // would need to support ReturnType<typeof setTimeout>, which is infeasible.
+    //
+    // We settle for type safety for the TimeoutProvider type, and accept that
+    // this class is unsafe internally to allow for extension.
+    __privateAdd(this, _provider, defaultTimeoutProvider);
+    __privateAdd(this, _providerCalled, false);
+  }
+  setTimeoutProvider(provider) {
+    if (process.env.NODE_ENV !== "production") {
+      if (__privateGet(this, _providerCalled) && provider !== __privateGet(this, _provider)) {
+        console.error(
+          `[timeoutManager]: Switching provider after calls to previous provider might result in unexpected behavior.`,
+          { previous: __privateGet(this, _provider), provider }
+        );
+      }
+    }
+    __privateSet(this, _provider, provider);
+    if (process.env.NODE_ENV !== "production") {
+      __privateSet(this, _providerCalled, false);
+    }
+  }
+  setTimeout(callback, delay) {
+    if (process.env.NODE_ENV !== "production") {
+      __privateSet(this, _providerCalled, true);
+    }
+    return __privateGet(this, _provider).setTimeout(callback, delay);
+  }
+  clearTimeout(timeoutId) {
+    __privateGet(this, _provider).clearTimeout(timeoutId);
+  }
+  setInterval(callback, delay) {
+    if (process.env.NODE_ENV !== "production") {
+      __privateSet(this, _providerCalled, true);
+    }
+    return __privateGet(this, _provider).setInterval(callback, delay);
+  }
+  clearInterval(intervalId) {
+    __privateGet(this, _provider).clearInterval(intervalId);
+  }
+}, _provider = new WeakMap(), _providerCalled = new WeakMap(), _a);
+var timeoutManager = new TimeoutManager();
+function systemSetTimeoutZero(callback) {
+  setTimeout(callback, 0);
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/utils.js
+var isServer = typeof window === "undefined" || "Deno" in globalThis;
+function noop() {
+}
+function functionalUpdate(updater, input) {
+  return typeof updater === "function" ? updater(input) : updater;
+}
+function isValidTimeout(value) {
+  return typeof value === "number" && value >= 0 && value !== Infinity;
+}
+function timeUntilStale(updatedAt, staleTime) {
+  return Math.max(updatedAt + (staleTime || 0) - Date.now(), 0);
+}
+function resolveStaleTime(staleTime, query) {
+  return typeof staleTime === "function" ? staleTime(query) : staleTime;
+}
+function resolveEnabled(enabled, query) {
+  return typeof enabled === "function" ? enabled(query) : enabled;
+}
+function matchQuery(filters, query) {
+  const {
+    type = "all",
+    exact,
+    fetchStatus,
+    predicate,
+    queryKey,
+    stale
+  } = filters;
+  if (queryKey) {
+    if (exact) {
+      if (query.queryHash !== hashQueryKeyByOptions(queryKey, query.options)) {
+        return false;
+      }
+    } else if (!partialMatchKey(query.queryKey, queryKey)) {
+      return false;
+    }
+  }
+  if (type !== "all") {
+    const isActive = query.isActive();
+    if (type === "active" && !isActive) {
+      return false;
+    }
+    if (type === "inactive" && isActive) {
+      return false;
+    }
+  }
+  if (typeof stale === "boolean" && query.isStale() !== stale) {
+    return false;
+  }
+  if (fetchStatus && fetchStatus !== query.state.fetchStatus) {
+    return false;
+  }
+  if (predicate && !predicate(query)) {
+    return false;
+  }
+  return true;
+}
+function matchMutation(filters, mutation) {
+  const { exact, status, predicate, mutationKey } = filters;
+  if (mutationKey) {
+    if (!mutation.options.mutationKey) {
+      return false;
+    }
+    if (exact) {
+      if (hashKey(mutation.options.mutationKey) !== hashKey(mutationKey)) {
+        return false;
+      }
+    } else if (!partialMatchKey(mutation.options.mutationKey, mutationKey)) {
+      return false;
+    }
+  }
+  if (status && mutation.state.status !== status) {
+    return false;
+  }
+  if (predicate && !predicate(mutation)) {
+    return false;
+  }
+  return true;
+}
+function hashQueryKeyByOptions(queryKey, options) {
+  const hashFn = (options == null ? void 0 : options.queryKeyHashFn) || hashKey;
+  return hashFn(queryKey);
+}
+function hashKey(queryKey) {
+  return JSON.stringify(
+    queryKey,
+    (_, val) => isPlainObject(val) ? Object.keys(val).sort().reduce((result, key) => {
+      result[key] = val[key];
+      return result;
+    }, {}) : val
+  );
+}
+function partialMatchKey(a, b) {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== typeof b) {
+    return false;
+  }
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    return Object.keys(b).every((key) => partialMatchKey(a[key], b[key]));
+  }
+  return false;
+}
+var hasOwn = Object.prototype.hasOwnProperty;
+function replaceEqualDeep(a, b) {
+  if (a === b) {
+    return a;
+  }
+  const array = isPlainArray(a) && isPlainArray(b);
+  if (!array && !(isPlainObject(a) && isPlainObject(b))) return b;
+  const aItems = array ? a : Object.keys(a);
+  const aSize = aItems.length;
+  const bItems = array ? b : Object.keys(b);
+  const bSize = bItems.length;
+  const copy = array ? new Array(bSize) : {};
+  let equalItems = 0;
+  for (let i = 0; i < bSize; i++) {
+    const key = array ? i : bItems[i];
+    const aItem = a[key];
+    const bItem = b[key];
+    if (aItem === bItem) {
+      copy[key] = aItem;
+      if (array ? i < aSize : hasOwn.call(a, key)) equalItems++;
+      continue;
+    }
+    if (aItem === null || bItem === null || typeof aItem !== "object" || typeof bItem !== "object") {
+      copy[key] = bItem;
+      continue;
+    }
+    const v = replaceEqualDeep(aItem, bItem);
+    copy[key] = v;
+    if (v === aItem) equalItems++;
+  }
+  return aSize === bSize && equalItems === aSize ? a : copy;
+}
+function isPlainArray(value) {
+  return Array.isArray(value) && value.length === Object.keys(value).length;
+}
+function isPlainObject(o) {
+  if (!hasObjectPrototype(o)) {
+    return false;
+  }
+  const ctor = o.constructor;
+  if (ctor === void 0) {
+    return true;
+  }
+  const prot = ctor.prototype;
+  if (!hasObjectPrototype(prot)) {
+    return false;
+  }
+  if (!prot.hasOwnProperty("isPrototypeOf")) {
+    return false;
+  }
+  if (Object.getPrototypeOf(o) !== Object.prototype) {
+    return false;
+  }
+  return true;
+}
+function hasObjectPrototype(o) {
+  return Object.prototype.toString.call(o) === "[object Object]";
+}
+function sleep(timeout) {
+  return new Promise((resolve) => {
+    timeoutManager.setTimeout(resolve, timeout);
+  });
+}
+function replaceData(prevData, data, options) {
+  if (typeof options.structuralSharing === "function") {
+    return options.structuralSharing(prevData, data);
+  } else if (options.structuralSharing !== false) {
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        return replaceEqualDeep(prevData, data);
+      } catch (error) {
+        console.error(
+          `Structural sharing requires data to be JSON serializable. To fix this, turn off structuralSharing or return JSON-serializable data from your queryFn. [${options.queryHash}]: ${error}`
+        );
+        throw error;
+      }
+    }
+    return replaceEqualDeep(prevData, data);
+  }
+  return data;
+}
+function addToEnd(items, item, max = 0) {
+  const newItems = [...items, item];
+  return max && newItems.length > max ? newItems.slice(1) : newItems;
+}
+function addToStart(items, item, max = 0) {
+  const newItems = [item, ...items];
+  return max && newItems.length > max ? newItems.slice(0, -1) : newItems;
+}
+var skipToken = Symbol();
+function ensureQueryFn(options, fetchOptions) {
+  if (process.env.NODE_ENV !== "production") {
+    if (options.queryFn === skipToken) {
+      console.error(
+        `Attempted to invoke queryFn when set to skipToken. This is likely a configuration error. Query hash: '${options.queryHash}'`
+      );
+    }
+  }
+  if (!options.queryFn && (fetchOptions == null ? void 0 : fetchOptions.initialPromise)) {
+    return () => fetchOptions.initialPromise;
+  }
+  if (!options.queryFn || options.queryFn === skipToken) {
+    return () => Promise.reject(new Error(`Missing queryFn: '${options.queryHash}'`));
+  }
+  return options.queryFn;
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/focusManager.js
+var _focused, _cleanup, _setup, _a2;
+var FocusManager = (_a2 = class extends Subscribable {
+  constructor() {
+    super();
+    __privateAdd(this, _focused);
+    __privateAdd(this, _cleanup);
+    __privateAdd(this, _setup);
+    __privateSet(this, _setup, (onFocus) => {
+      if (!isServer && window.addEventListener) {
+        const listener = () => onFocus();
+        window.addEventListener("visibilitychange", listener, false);
+        return () => {
+          window.removeEventListener("visibilitychange", listener);
+        };
+      }
+      return;
+    });
+  }
+  onSubscribe() {
+    if (!__privateGet(this, _cleanup)) {
+      this.setEventListener(__privateGet(this, _setup));
+    }
+  }
+  onUnsubscribe() {
+    var _a10;
+    if (!this.hasListeners()) {
+      (_a10 = __privateGet(this, _cleanup)) == null ? void 0 : _a10.call(this);
+      __privateSet(this, _cleanup, void 0);
+    }
+  }
+  setEventListener(setup) {
+    var _a10;
+    __privateSet(this, _setup, setup);
+    (_a10 = __privateGet(this, _cleanup)) == null ? void 0 : _a10.call(this);
+    __privateSet(this, _cleanup, setup((focused) => {
+      if (typeof focused === "boolean") {
+        this.setFocused(focused);
+      } else {
+        this.onFocus();
+      }
+    }));
+  }
+  setFocused(focused) {
+    const changed = __privateGet(this, _focused) !== focused;
+    if (changed) {
+      __privateSet(this, _focused, focused);
+      this.onFocus();
+    }
+  }
+  onFocus() {
+    const isFocused = this.isFocused();
+    this.listeners.forEach((listener) => {
+      listener(isFocused);
+    });
+  }
+  isFocused() {
+    var _a10;
+    if (typeof __privateGet(this, _focused) === "boolean") {
+      return __privateGet(this, _focused);
+    }
+    return ((_a10 = globalThis.document) == null ? void 0 : _a10.visibilityState) !== "hidden";
+  }
+}, _focused = new WeakMap(), _cleanup = new WeakMap(), _setup = new WeakMap(), _a2);
+var focusManager = new FocusManager();
+
+// ../../node_modules/@tanstack/query-core/build/modern/thenable.js
+function pendingThenable() {
+  let resolve;
+  let reject;
+  const thenable = new Promise((_resolve, _reject) => {
+    resolve = _resolve;
+    reject = _reject;
+  });
+  thenable.status = "pending";
+  thenable.catch(() => {
+  });
+  function finalize(data) {
+    Object.assign(thenable, data);
+    delete thenable.resolve;
+    delete thenable.reject;
+  }
+  thenable.resolve = (value) => {
+    finalize({
+      status: "fulfilled",
+      value
+    });
+    resolve(value);
+  };
+  thenable.reject = (reason) => {
+    finalize({
+      status: "rejected",
+      reason
+    });
+    reject(reason);
+  };
+  return thenable;
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/notifyManager.js
+var defaultScheduler = systemSetTimeoutZero;
+function createNotifyManager() {
+  let queue = [];
+  let transactions = 0;
+  let notifyFn = (callback) => {
+    callback();
+  };
+  let batchNotifyFn = (callback) => {
+    callback();
+  };
+  let scheduleFn = defaultScheduler;
+  const schedule = (callback) => {
+    if (transactions) {
+      queue.push(callback);
+    } else {
+      scheduleFn(() => {
+        notifyFn(callback);
+      });
+    }
+  };
+  const flush = () => {
+    const originalQueue = queue;
+    queue = [];
+    if (originalQueue.length) {
+      scheduleFn(() => {
+        batchNotifyFn(() => {
+          originalQueue.forEach((callback) => {
+            notifyFn(callback);
+          });
+        });
+      });
+    }
+  };
+  return {
+    batch: (callback) => {
+      let result;
+      transactions++;
+      try {
+        result = callback();
+      } finally {
+        transactions--;
+        if (!transactions) {
+          flush();
+        }
+      }
+      return result;
+    },
+    /**
+     * All calls to the wrapped function will be batched.
+     */
+    batchCalls: (callback) => {
+      return (...args) => {
+        schedule(() => {
+          callback(...args);
+        });
+      };
+    },
+    schedule,
+    /**
+     * Use this method to set a custom notify function.
+     * This can be used to for example wrap notifications with `React.act` while running tests.
+     */
+    setNotifyFunction: (fn) => {
+      notifyFn = fn;
+    },
+    /**
+     * Use this method to set a custom function to batch notifications together into a single tick.
+     * By default React Query will use the batch function provided by ReactDOM or React Native.
+     */
+    setBatchNotifyFunction: (fn) => {
+      batchNotifyFn = fn;
+    },
+    setScheduler: (fn) => {
+      scheduleFn = fn;
+    }
+  };
+}
+var notifyManager = createNotifyManager();
+
+// ../../node_modules/@tanstack/query-core/build/modern/onlineManager.js
+var _online, _cleanup2, _setup2, _a3;
+var OnlineManager = (_a3 = class extends Subscribable {
+  constructor() {
+    super();
+    __privateAdd(this, _online, true);
+    __privateAdd(this, _cleanup2);
+    __privateAdd(this, _setup2);
+    __privateSet(this, _setup2, (onOnline) => {
+      if (!isServer && window.addEventListener) {
+        const onlineListener = () => onOnline(true);
+        const offlineListener = () => onOnline(false);
+        window.addEventListener("online", onlineListener, false);
+        window.addEventListener("offline", offlineListener, false);
+        return () => {
+          window.removeEventListener("online", onlineListener);
+          window.removeEventListener("offline", offlineListener);
+        };
+      }
+      return;
+    });
+  }
+  onSubscribe() {
+    if (!__privateGet(this, _cleanup2)) {
+      this.setEventListener(__privateGet(this, _setup2));
+    }
+  }
+  onUnsubscribe() {
+    var _a10;
+    if (!this.hasListeners()) {
+      (_a10 = __privateGet(this, _cleanup2)) == null ? void 0 : _a10.call(this);
+      __privateSet(this, _cleanup2, void 0);
+    }
+  }
+  setEventListener(setup) {
+    var _a10;
+    __privateSet(this, _setup2, setup);
+    (_a10 = __privateGet(this, _cleanup2)) == null ? void 0 : _a10.call(this);
+    __privateSet(this, _cleanup2, setup(this.setOnline.bind(this)));
+  }
+  setOnline(online) {
+    const changed = __privateGet(this, _online) !== online;
+    if (changed) {
+      __privateSet(this, _online, online);
+      this.listeners.forEach((listener) => {
+        listener(online);
+      });
+    }
+  }
+  isOnline() {
+    return __privateGet(this, _online);
+  }
+}, _online = new WeakMap(), _cleanup2 = new WeakMap(), _setup2 = new WeakMap(), _a3);
+var onlineManager = new OnlineManager();
+
+// ../../node_modules/@tanstack/query-core/build/modern/retryer.js
+function defaultRetryDelay(failureCount) {
+  return Math.min(1e3 * 2 ** failureCount, 3e4);
+}
+function canFetch(networkMode) {
+  return (networkMode != null ? networkMode : "online") === "online" ? onlineManager.isOnline() : true;
+}
+var CancelledError = class extends Error {
+  constructor(options) {
+    super("CancelledError");
+    this.revert = options == null ? void 0 : options.revert;
+    this.silent = options == null ? void 0 : options.silent;
+  }
+};
+function createRetryer(config2) {
+  let isRetryCancelled = false;
+  let failureCount = 0;
+  let continueFn;
+  const thenable = pendingThenable();
+  const isResolved = () => thenable.status !== "pending";
+  const cancel = (cancelOptions) => {
+    var _a10;
+    if (!isResolved()) {
+      const error = new CancelledError(cancelOptions);
+      reject(error);
+      (_a10 = config2.onCancel) == null ? void 0 : _a10.call(config2, error);
+    }
+  };
+  const cancelRetry = () => {
+    isRetryCancelled = true;
+  };
+  const continueRetry = () => {
+    isRetryCancelled = false;
+  };
+  const canContinue = () => focusManager.isFocused() && (config2.networkMode === "always" || onlineManager.isOnline()) && config2.canRun();
+  const canStart = () => canFetch(config2.networkMode) && config2.canRun();
+  const resolve = (value) => {
+    if (!isResolved()) {
+      continueFn == null ? void 0 : continueFn();
+      thenable.resolve(value);
+    }
+  };
+  const reject = (value) => {
+    if (!isResolved()) {
+      continueFn == null ? void 0 : continueFn();
+      thenable.reject(value);
+    }
+  };
+  const pause = () => {
+    return new Promise((continueResolve) => {
+      var _a10;
+      continueFn = (value) => {
+        if (isResolved() || canContinue()) {
+          continueResolve(value);
+        }
+      };
+      (_a10 = config2.onPause) == null ? void 0 : _a10.call(config2);
+    }).then(() => {
+      var _a10;
+      continueFn = void 0;
+      if (!isResolved()) {
+        (_a10 = config2.onContinue) == null ? void 0 : _a10.call(config2);
+      }
+    });
+  };
+  const run = () => {
+    if (isResolved()) {
+      return;
+    }
+    let promiseOrValue;
+    const initialPromise = failureCount === 0 ? config2.initialPromise : void 0;
+    try {
+      promiseOrValue = initialPromise != null ? initialPromise : config2.fn();
+    } catch (error) {
+      promiseOrValue = Promise.reject(error);
+    }
+    Promise.resolve(promiseOrValue).then(resolve).catch((error) => {
+      var _a10, _b, _c;
+      if (isResolved()) {
+        return;
+      }
+      const retry = (_a10 = config2.retry) != null ? _a10 : isServer ? 0 : 3;
+      const retryDelay = (_b = config2.retryDelay) != null ? _b : defaultRetryDelay;
+      const delay = typeof retryDelay === "function" ? retryDelay(failureCount, error) : retryDelay;
+      const shouldRetry = retry === true || typeof retry === "number" && failureCount < retry || typeof retry === "function" && retry(failureCount, error);
+      if (isRetryCancelled || !shouldRetry) {
+        reject(error);
+        return;
+      }
+      failureCount++;
+      (_c = config2.onFail) == null ? void 0 : _c.call(config2, failureCount, error);
+      sleep(delay).then(() => {
+        return canContinue() ? void 0 : pause();
+      }).then(() => {
+        if (isRetryCancelled) {
+          reject(error);
+        } else {
+          run();
+        }
+      });
+    });
+  };
+  return {
+    promise: thenable,
+    status: () => thenable.status,
+    cancel,
+    continue: () => {
+      continueFn == null ? void 0 : continueFn();
+      return thenable;
+    },
+    cancelRetry,
+    continueRetry,
+    canStart,
+    start: () => {
+      if (canStart()) {
+        run();
+      } else {
+        pause().then(run);
+      }
+      return thenable;
+    }
+  };
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/removable.js
+var _gcTimeout, _a4;
+var Removable = (_a4 = class {
+  constructor() {
+    __privateAdd(this, _gcTimeout);
+  }
+  destroy() {
+    this.clearGcTimeout();
+  }
+  scheduleGc() {
+    this.clearGcTimeout();
+    if (isValidTimeout(this.gcTime)) {
+      __privateSet(this, _gcTimeout, timeoutManager.setTimeout(() => {
+        this.optionalRemove();
+      }, this.gcTime));
+    }
+  }
+  updateGcTime(newGcTime) {
+    this.gcTime = Math.max(
+      this.gcTime || 0,
+      newGcTime != null ? newGcTime : isServer ? Infinity : 5 * 60 * 1e3
+    );
+  }
+  clearGcTimeout() {
+    if (__privateGet(this, _gcTimeout)) {
+      timeoutManager.clearTimeout(__privateGet(this, _gcTimeout));
+      __privateSet(this, _gcTimeout, void 0);
+    }
+  }
+}, _gcTimeout = new WeakMap(), _a4);
+
+// ../../node_modules/@tanstack/query-core/build/modern/query.js
+var _initialState, _revertState, _cache, _client, _retryer, _defaultOptions, _abortSignalConsumed, _Query_instances, dispatch_fn, _a5;
+var Query = (_a5 = class extends Removable {
+  constructor(config2) {
+    var _a10;
+    super();
+    __privateAdd(this, _Query_instances);
+    __privateAdd(this, _initialState);
+    __privateAdd(this, _revertState);
+    __privateAdd(this, _cache);
+    __privateAdd(this, _client);
+    __privateAdd(this, _retryer);
+    __privateAdd(this, _defaultOptions);
+    __privateAdd(this, _abortSignalConsumed);
+    __privateSet(this, _abortSignalConsumed, false);
+    __privateSet(this, _defaultOptions, config2.defaultOptions);
+    this.setOptions(config2.options);
+    this.observers = [];
+    __privateSet(this, _client, config2.client);
+    __privateSet(this, _cache, __privateGet(this, _client).getQueryCache());
+    this.queryKey = config2.queryKey;
+    this.queryHash = config2.queryHash;
+    __privateSet(this, _initialState, getDefaultState(this.options));
+    this.state = (_a10 = config2.state) != null ? _a10 : __privateGet(this, _initialState);
+    this.scheduleGc();
+  }
+  get meta() {
+    return this.options.meta;
+  }
+  get promise() {
+    var _a10;
+    return (_a10 = __privateGet(this, _retryer)) == null ? void 0 : _a10.promise;
+  }
+  setOptions(options) {
+    this.options = { ...__privateGet(this, _defaultOptions), ...options };
+    this.updateGcTime(this.options.gcTime);
+    if (this.state && this.state.data === void 0) {
+      const defaultState = getDefaultState(this.options);
+      if (defaultState.data !== void 0) {
+        this.setData(defaultState.data, {
+          updatedAt: defaultState.dataUpdatedAt,
+          manual: true
+        });
+        __privateSet(this, _initialState, defaultState);
+      }
+    }
+  }
+  optionalRemove() {
+    if (!this.observers.length && this.state.fetchStatus === "idle") {
+      __privateGet(this, _cache).remove(this);
+    }
+  }
+  setData(newData, options) {
+    const data = replaceData(this.state.data, newData, this.options);
+    __privateMethod(this, _Query_instances, dispatch_fn).call(this, {
+      data,
+      type: "success",
+      dataUpdatedAt: options == null ? void 0 : options.updatedAt,
+      manual: options == null ? void 0 : options.manual
+    });
+    return data;
+  }
+  setState(state, setStateOptions) {
+    __privateMethod(this, _Query_instances, dispatch_fn).call(this, { type: "setState", state, setStateOptions });
+  }
+  cancel(options) {
+    var _a10, _b;
+    const promise = (_a10 = __privateGet(this, _retryer)) == null ? void 0 : _a10.promise;
+    (_b = __privateGet(this, _retryer)) == null ? void 0 : _b.cancel(options);
+    return promise ? promise.then(noop).catch(noop) : Promise.resolve();
+  }
+  destroy() {
+    super.destroy();
+    this.cancel({ silent: true });
+  }
+  reset() {
+    this.destroy();
+    this.setState(__privateGet(this, _initialState));
+  }
+  isActive() {
+    return this.observers.some(
+      (observer) => resolveEnabled(observer.options.enabled, this) !== false
+    );
+  }
+  isDisabled() {
+    if (this.getObserversCount() > 0) {
+      return !this.isActive();
+    }
+    return this.options.queryFn === skipToken || this.state.dataUpdateCount + this.state.errorUpdateCount === 0;
+  }
+  isStatic() {
+    if (this.getObserversCount() > 0) {
+      return this.observers.some(
+        (observer) => resolveStaleTime(observer.options.staleTime, this) === "static"
+      );
+    }
+    return false;
+  }
+  isStale() {
+    if (this.getObserversCount() > 0) {
+      return this.observers.some(
+        (observer) => observer.getCurrentResult().isStale
+      );
+    }
+    return this.state.data === void 0 || this.state.isInvalidated;
+  }
+  isStaleByTime(staleTime = 0) {
+    if (this.state.data === void 0) {
+      return true;
+    }
+    if (staleTime === "static") {
+      return false;
+    }
+    if (this.state.isInvalidated) {
+      return true;
+    }
+    return !timeUntilStale(this.state.dataUpdatedAt, staleTime);
+  }
+  onFocus() {
+    var _a10;
+    const observer = this.observers.find((x) => x.shouldFetchOnWindowFocus());
+    observer == null ? void 0 : observer.refetch({ cancelRefetch: false });
+    (_a10 = __privateGet(this, _retryer)) == null ? void 0 : _a10.continue();
+  }
+  onOnline() {
+    var _a10;
+    const observer = this.observers.find((x) => x.shouldFetchOnReconnect());
+    observer == null ? void 0 : observer.refetch({ cancelRefetch: false });
+    (_a10 = __privateGet(this, _retryer)) == null ? void 0 : _a10.continue();
+  }
+  addObserver(observer) {
+    if (!this.observers.includes(observer)) {
+      this.observers.push(observer);
+      this.clearGcTimeout();
+      __privateGet(this, _cache).notify({ type: "observerAdded", query: this, observer });
+    }
+  }
+  removeObserver(observer) {
+    if (this.observers.includes(observer)) {
+      this.observers = this.observers.filter((x) => x !== observer);
+      if (!this.observers.length) {
+        if (__privateGet(this, _retryer)) {
+          if (__privateGet(this, _abortSignalConsumed)) {
+            __privateGet(this, _retryer).cancel({ revert: true });
+          } else {
+            __privateGet(this, _retryer).cancelRetry();
+          }
+        }
+        this.scheduleGc();
+      }
+      __privateGet(this, _cache).notify({ type: "observerRemoved", query: this, observer });
+    }
+  }
+  getObserversCount() {
+    return this.observers.length;
+  }
+  invalidate() {
+    if (!this.state.isInvalidated) {
+      __privateMethod(this, _Query_instances, dispatch_fn).call(this, { type: "invalidate" });
+    }
+  }
+  async fetch(options, fetchOptions) {
+    var _a10, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    if (this.state.fetchStatus !== "idle" && // If the promise in the retyer is already rejected, we have to definitely
+    // re-start the fetch; there is a chance that the query is still in a
+    // pending state when that happens
+    ((_a10 = __privateGet(this, _retryer)) == null ? void 0 : _a10.status()) !== "rejected") {
+      if (this.state.data !== void 0 && (fetchOptions == null ? void 0 : fetchOptions.cancelRefetch)) {
+        this.cancel({ silent: true });
+      } else if (__privateGet(this, _retryer)) {
+        __privateGet(this, _retryer).continueRetry();
+        return __privateGet(this, _retryer).promise;
+      }
+    }
+    if (options) {
+      this.setOptions(options);
+    }
+    if (!this.options.queryFn) {
+      const observer = this.observers.find((x) => x.options.queryFn);
+      if (observer) {
+        this.setOptions(observer.options);
+      }
+    }
+    if (process.env.NODE_ENV !== "production") {
+      if (!Array.isArray(this.options.queryKey)) {
+        console.error(
+          `As of v4, queryKey needs to be an Array. If you are using a string like 'repoData', please change it to an Array, e.g. ['repoData']`
+        );
+      }
+    }
+    const abortController = new AbortController();
+    const addSignalProperty = (object) => {
+      Object.defineProperty(object, "signal", {
+        enumerable: true,
+        get: () => {
+          __privateSet(this, _abortSignalConsumed, true);
+          return abortController.signal;
+        }
+      });
+    };
+    const fetchFn = () => {
+      const queryFn = ensureQueryFn(this.options, fetchOptions);
+      const createQueryFnContext = () => {
+        const queryFnContext2 = {
+          client: __privateGet(this, _client),
+          queryKey: this.queryKey,
+          meta: this.meta
+        };
+        addSignalProperty(queryFnContext2);
+        return queryFnContext2;
+      };
+      const queryFnContext = createQueryFnContext();
+      __privateSet(this, _abortSignalConsumed, false);
+      if (this.options.persister) {
+        return this.options.persister(
+          queryFn,
+          queryFnContext,
+          this
+        );
+      }
+      return queryFn(queryFnContext);
+    };
+    const createFetchContext = () => {
+      const context2 = {
+        fetchOptions,
+        options: this.options,
+        queryKey: this.queryKey,
+        client: __privateGet(this, _client),
+        state: this.state,
+        fetchFn
+      };
+      addSignalProperty(context2);
+      return context2;
+    };
+    const context = createFetchContext();
+    (_b = this.options.behavior) == null ? void 0 : _b.onFetch(context, this);
+    __privateSet(this, _revertState, this.state);
+    if (this.state.fetchStatus === "idle" || this.state.fetchMeta !== ((_c = context.fetchOptions) == null ? void 0 : _c.meta)) {
+      __privateMethod(this, _Query_instances, dispatch_fn).call(this, { type: "fetch", meta: (_d = context.fetchOptions) == null ? void 0 : _d.meta });
+    }
+    __privateSet(this, _retryer, createRetryer({
+      initialPromise: fetchOptions == null ? void 0 : fetchOptions.initialPromise,
+      fn: context.fetchFn,
+      onCancel: (error) => {
+        if (error instanceof CancelledError && error.revert) {
+          this.setState({
+            ...__privateGet(this, _revertState),
+            fetchStatus: "idle"
+          });
+        }
+        abortController.abort();
+      },
+      onFail: (failureCount, error) => {
+        __privateMethod(this, _Query_instances, dispatch_fn).call(this, { type: "failed", failureCount, error });
+      },
+      onPause: () => {
+        __privateMethod(this, _Query_instances, dispatch_fn).call(this, { type: "pause" });
+      },
+      onContinue: () => {
+        __privateMethod(this, _Query_instances, dispatch_fn).call(this, { type: "continue" });
+      },
+      retry: context.options.retry,
+      retryDelay: context.options.retryDelay,
+      networkMode: context.options.networkMode,
+      canRun: () => true
+    }));
+    try {
+      const data = await __privateGet(this, _retryer).start();
+      if (data === void 0) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error(
+            `Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ${this.queryHash}`
+          );
+        }
+        throw new Error(`${this.queryHash} data is undefined`);
+      }
+      this.setData(data);
+      (_f = (_e = __privateGet(this, _cache).config).onSuccess) == null ? void 0 : _f.call(_e, data, this);
+      (_h = (_g = __privateGet(this, _cache).config).onSettled) == null ? void 0 : _h.call(
+        _g,
+        data,
+        this.state.error,
+        this
+      );
+      return data;
+    } catch (error) {
+      if (error instanceof CancelledError) {
+        if (error.silent) {
+          return __privateGet(this, _retryer).promise;
+        } else if (error.revert) {
+          if (this.state.data === void 0) {
+            throw error;
+          }
+          return this.state.data;
+        }
+      }
+      __privateMethod(this, _Query_instances, dispatch_fn).call(this, {
+        type: "error",
+        error
+      });
+      (_j = (_i = __privateGet(this, _cache).config).onError) == null ? void 0 : _j.call(
+        _i,
+        error,
+        this
+      );
+      (_l = (_k = __privateGet(this, _cache).config).onSettled) == null ? void 0 : _l.call(
+        _k,
+        this.state.data,
+        error,
+        this
+      );
+      throw error;
+    } finally {
+      this.scheduleGc();
+    }
+  }
+}, _initialState = new WeakMap(), _revertState = new WeakMap(), _cache = new WeakMap(), _client = new WeakMap(), _retryer = new WeakMap(), _defaultOptions = new WeakMap(), _abortSignalConsumed = new WeakMap(), _Query_instances = new WeakSet(), dispatch_fn = function(action) {
+  const reducer = (state) => {
+    var _a10, _b;
+    switch (action.type) {
+      case "failed":
+        return {
+          ...state,
+          fetchFailureCount: action.failureCount,
+          fetchFailureReason: action.error
+        };
+      case "pause":
+        return {
+          ...state,
+          fetchStatus: "paused"
+        };
+      case "continue":
+        return {
+          ...state,
+          fetchStatus: "fetching"
+        };
+      case "fetch":
+        return {
+          ...state,
+          ...fetchState(state.data, this.options),
+          fetchMeta: (_a10 = action.meta) != null ? _a10 : null
+        };
+      case "success":
+        const newState = {
+          ...state,
+          data: action.data,
+          dataUpdateCount: state.dataUpdateCount + 1,
+          dataUpdatedAt: (_b = action.dataUpdatedAt) != null ? _b : Date.now(),
+          error: null,
+          isInvalidated: false,
+          status: "success",
+          ...!action.manual && {
+            fetchStatus: "idle",
+            fetchFailureCount: 0,
+            fetchFailureReason: null
+          }
+        };
+        __privateSet(this, _revertState, action.manual ? newState : void 0);
+        return newState;
+      case "error":
+        const error = action.error;
+        return {
+          ...state,
+          error,
+          errorUpdateCount: state.errorUpdateCount + 1,
+          errorUpdatedAt: Date.now(),
+          fetchFailureCount: state.fetchFailureCount + 1,
+          fetchFailureReason: error,
+          fetchStatus: "idle",
+          status: "error"
+        };
+      case "invalidate":
+        return {
+          ...state,
+          isInvalidated: true
+        };
+      case "setState":
+        return {
+          ...state,
+          ...action.state
+        };
+    }
+  };
+  this.state = reducer(this.state);
+  notifyManager.batch(() => {
+    this.observers.forEach((observer) => {
+      observer.onQueryUpdate();
+    });
+    __privateGet(this, _cache).notify({ query: this, type: "updated", action });
+  });
+}, _a5);
+function fetchState(data, options) {
+  return {
+    fetchFailureCount: 0,
+    fetchFailureReason: null,
+    fetchStatus: canFetch(options.networkMode) ? "fetching" : "paused",
+    ...data === void 0 && {
+      error: null,
+      status: "pending"
+    }
+  };
+}
+function getDefaultState(options) {
+  const data = typeof options.initialData === "function" ? options.initialData() : options.initialData;
+  const hasData = data !== void 0;
+  const initialDataUpdatedAt = hasData ? typeof options.initialDataUpdatedAt === "function" ? options.initialDataUpdatedAt() : options.initialDataUpdatedAt : 0;
+  return {
+    data,
+    dataUpdateCount: 0,
+    dataUpdatedAt: hasData ? initialDataUpdatedAt != null ? initialDataUpdatedAt : Date.now() : 0,
+    error: null,
+    errorUpdateCount: 0,
+    errorUpdatedAt: 0,
+    fetchFailureCount: 0,
+    fetchFailureReason: null,
+    fetchMeta: null,
+    isInvalidated: false,
+    status: hasData ? "success" : "pending",
+    fetchStatus: "idle"
+  };
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/infiniteQueryBehavior.js
+function infiniteQueryBehavior(pages) {
+  return {
+    onFetch: (context, query) => {
+      var _a10, _b, _c, _d, _e;
+      const options = context.options;
+      const direction = (_c = (_b = (_a10 = context.fetchOptions) == null ? void 0 : _a10.meta) == null ? void 0 : _b.fetchMore) == null ? void 0 : _c.direction;
+      const oldPages = ((_d = context.state.data) == null ? void 0 : _d.pages) || [];
+      const oldPageParams = ((_e = context.state.data) == null ? void 0 : _e.pageParams) || [];
+      let result = { pages: [], pageParams: [] };
+      let currentPage = 0;
+      const fetchFn = async () => {
+        var _a11;
+        let cancelled = false;
+        const addSignalProperty = (object) => {
+          Object.defineProperty(object, "signal", {
+            enumerable: true,
+            get: () => {
+              if (context.signal.aborted) {
+                cancelled = true;
+              } else {
+                context.signal.addEventListener("abort", () => {
+                  cancelled = true;
+                });
+              }
+              return context.signal;
+            }
+          });
+        };
+        const queryFn = ensureQueryFn(context.options, context.fetchOptions);
+        const fetchPage = async (data, param, previous) => {
+          if (cancelled) {
+            return Promise.reject();
+          }
+          if (param == null && data.pages.length) {
+            return Promise.resolve(data);
+          }
+          const createQueryFnContext = () => {
+            const queryFnContext2 = {
+              client: context.client,
+              queryKey: context.queryKey,
+              pageParam: param,
+              direction: previous ? "backward" : "forward",
+              meta: context.options.meta
+            };
+            addSignalProperty(queryFnContext2);
+            return queryFnContext2;
+          };
+          const queryFnContext = createQueryFnContext();
+          const page = await queryFn(queryFnContext);
+          const { maxPages } = context.options;
+          const addTo = previous ? addToStart : addToEnd;
+          return {
+            pages: addTo(data.pages, page, maxPages),
+            pageParams: addTo(data.pageParams, param, maxPages)
+          };
+        };
+        if (direction && oldPages.length) {
+          const previous = direction === "backward";
+          const pageParamFn = previous ? getPreviousPageParam : getNextPageParam;
+          const oldData = {
+            pages: oldPages,
+            pageParams: oldPageParams
+          };
+          const param = pageParamFn(options, oldData);
+          result = await fetchPage(oldData, param, previous);
+        } else {
+          const remainingPages = pages != null ? pages : oldPages.length;
+          do {
+            const param = currentPage === 0 ? (_a11 = oldPageParams[0]) != null ? _a11 : options.initialPageParam : getNextPageParam(options, result);
+            if (currentPage > 0 && param == null) {
+              break;
+            }
+            result = await fetchPage(result, param);
+            currentPage++;
+          } while (currentPage < remainingPages);
+        }
+        return result;
+      };
+      if (context.options.persister) {
+        context.fetchFn = () => {
+          var _a11, _b2;
+          return (_b2 = (_a11 = context.options).persister) == null ? void 0 : _b2.call(
+            _a11,
+            fetchFn,
+            {
+              client: context.client,
+              queryKey: context.queryKey,
+              meta: context.options.meta,
+              signal: context.signal
+            },
+            query
+          );
+        };
+      } else {
+        context.fetchFn = fetchFn;
+      }
+    }
+  };
+}
+function getNextPageParam(options, { pages, pageParams }) {
+  const lastIndex = pages.length - 1;
+  return pages.length > 0 ? options.getNextPageParam(
+    pages[lastIndex],
+    pages,
+    pageParams[lastIndex],
+    pageParams
+  ) : void 0;
+}
+function getPreviousPageParam(options, { pages, pageParams }) {
+  var _a10;
+  return pages.length > 0 ? (_a10 = options.getPreviousPageParam) == null ? void 0 : _a10.call(options, pages[0], pages, pageParams[0], pageParams) : void 0;
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/mutation.js
+var _client2, _observers, _mutationCache, _retryer2, _Mutation_instances, dispatch_fn2, _a6;
+var Mutation = (_a6 = class extends Removable {
+  constructor(config2) {
+    super();
+    __privateAdd(this, _Mutation_instances);
+    __privateAdd(this, _client2);
+    __privateAdd(this, _observers);
+    __privateAdd(this, _mutationCache);
+    __privateAdd(this, _retryer2);
+    __privateSet(this, _client2, config2.client);
+    this.mutationId = config2.mutationId;
+    __privateSet(this, _mutationCache, config2.mutationCache);
+    __privateSet(this, _observers, []);
+    this.state = config2.state || getDefaultState2();
+    this.setOptions(config2.options);
+    this.scheduleGc();
+  }
+  setOptions(options) {
+    this.options = options;
+    this.updateGcTime(this.options.gcTime);
+  }
+  get meta() {
+    return this.options.meta;
+  }
+  addObserver(observer) {
+    if (!__privateGet(this, _observers).includes(observer)) {
+      __privateGet(this, _observers).push(observer);
+      this.clearGcTimeout();
+      __privateGet(this, _mutationCache).notify({
+        type: "observerAdded",
+        mutation: this,
+        observer
+      });
+    }
+  }
+  removeObserver(observer) {
+    __privateSet(this, _observers, __privateGet(this, _observers).filter((x) => x !== observer));
+    this.scheduleGc();
+    __privateGet(this, _mutationCache).notify({
+      type: "observerRemoved",
+      mutation: this,
+      observer
+    });
+  }
+  optionalRemove() {
+    if (!__privateGet(this, _observers).length) {
+      if (this.state.status === "pending") {
+        this.scheduleGc();
+      } else {
+        __privateGet(this, _mutationCache).remove(this);
+      }
+    }
+  }
+  continue() {
+    var _a10, _b;
+    return (_b = (_a10 = __privateGet(this, _retryer2)) == null ? void 0 : _a10.continue()) != null ? _b : (
+      // continuing a mutation assumes that variables are set, mutation must have been dehydrated before
+      this.execute(this.state.variables)
+    );
+  }
+  async execute(variables) {
+    var _a10, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
+    const onContinue = () => {
+      __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, { type: "continue" });
+    };
+    const mutationFnContext = {
+      client: __privateGet(this, _client2),
+      meta: this.options.meta,
+      mutationKey: this.options.mutationKey
+    };
+    __privateSet(this, _retryer2, createRetryer({
+      fn: () => {
+        if (!this.options.mutationFn) {
+          return Promise.reject(new Error("No mutationFn found"));
+        }
+        return this.options.mutationFn(variables, mutationFnContext);
+      },
+      onFail: (failureCount, error) => {
+        __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, { type: "failed", failureCount, error });
+      },
+      onPause: () => {
+        __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, { type: "pause" });
+      },
+      onContinue,
+      retry: (_a10 = this.options.retry) != null ? _a10 : 0,
+      retryDelay: this.options.retryDelay,
+      networkMode: this.options.networkMode,
+      canRun: () => __privateGet(this, _mutationCache).canRun(this)
+    }));
+    const restored = this.state.status === "pending";
+    const isPaused = !__privateGet(this, _retryer2).canStart();
+    try {
+      if (restored) {
+        onContinue();
+      } else {
+        __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, { type: "pending", variables, isPaused });
+        await ((_c = (_b = __privateGet(this, _mutationCache).config).onMutate) == null ? void 0 : _c.call(
+          _b,
+          variables,
+          this,
+          mutationFnContext
+        ));
+        const context = await ((_e = (_d = this.options).onMutate) == null ? void 0 : _e.call(
+          _d,
+          variables,
+          mutationFnContext
+        ));
+        if (context !== this.state.context) {
+          __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, {
+            type: "pending",
+            context,
+            variables,
+            isPaused
+          });
+        }
+      }
+      const data = await __privateGet(this, _retryer2).start();
+      await ((_g = (_f = __privateGet(this, _mutationCache).config).onSuccess) == null ? void 0 : _g.call(
+        _f,
+        data,
+        variables,
+        this.state.context,
+        this,
+        mutationFnContext
+      ));
+      await ((_i = (_h = this.options).onSuccess) == null ? void 0 : _i.call(
+        _h,
+        data,
+        variables,
+        this.state.context,
+        mutationFnContext
+      ));
+      await ((_k = (_j = __privateGet(this, _mutationCache).config).onSettled) == null ? void 0 : _k.call(
+        _j,
+        data,
+        null,
+        this.state.variables,
+        this.state.context,
+        this,
+        mutationFnContext
+      ));
+      await ((_m = (_l = this.options).onSettled) == null ? void 0 : _m.call(
+        _l,
+        data,
+        null,
+        variables,
+        this.state.context,
+        mutationFnContext
+      ));
+      __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, { type: "success", data });
+      return data;
+    } catch (error) {
+      try {
+        await ((_o = (_n = __privateGet(this, _mutationCache).config).onError) == null ? void 0 : _o.call(
+          _n,
+          error,
+          variables,
+          this.state.context,
+          this,
+          mutationFnContext
+        ));
+        await ((_q = (_p = this.options).onError) == null ? void 0 : _q.call(
+          _p,
+          error,
+          variables,
+          this.state.context,
+          mutationFnContext
+        ));
+        await ((_s = (_r = __privateGet(this, _mutationCache).config).onSettled) == null ? void 0 : _s.call(
+          _r,
+          void 0,
+          error,
+          this.state.variables,
+          this.state.context,
+          this,
+          mutationFnContext
+        ));
+        await ((_u = (_t = this.options).onSettled) == null ? void 0 : _u.call(
+          _t,
+          void 0,
+          error,
+          variables,
+          this.state.context,
+          mutationFnContext
+        ));
+        throw error;
+      } finally {
+        __privateMethod(this, _Mutation_instances, dispatch_fn2).call(this, { type: "error", error });
+      }
+    } finally {
+      __privateGet(this, _mutationCache).runNext(this);
+    }
+  }
+}, _client2 = new WeakMap(), _observers = new WeakMap(), _mutationCache = new WeakMap(), _retryer2 = new WeakMap(), _Mutation_instances = new WeakSet(), dispatch_fn2 = function(action) {
+  const reducer = (state) => {
+    switch (action.type) {
+      case "failed":
+        return {
+          ...state,
+          failureCount: action.failureCount,
+          failureReason: action.error
+        };
+      case "pause":
+        return {
+          ...state,
+          isPaused: true
+        };
+      case "continue":
+        return {
+          ...state,
+          isPaused: false
+        };
+      case "pending":
+        return {
+          ...state,
+          context: action.context,
+          data: void 0,
+          failureCount: 0,
+          failureReason: null,
+          error: null,
+          isPaused: action.isPaused,
+          status: "pending",
+          variables: action.variables,
+          submittedAt: Date.now()
+        };
+      case "success":
+        return {
+          ...state,
+          data: action.data,
+          failureCount: 0,
+          failureReason: null,
+          error: null,
+          status: "success",
+          isPaused: false
+        };
+      case "error":
+        return {
+          ...state,
+          data: void 0,
+          error: action.error,
+          failureCount: state.failureCount + 1,
+          failureReason: action.error,
+          isPaused: false,
+          status: "error"
+        };
+    }
+  };
+  this.state = reducer(this.state);
+  notifyManager.batch(() => {
+    __privateGet(this, _observers).forEach((observer) => {
+      observer.onMutationUpdate(action);
+    });
+    __privateGet(this, _mutationCache).notify({
+      mutation: this,
+      type: "updated",
+      action
+    });
+  });
+}, _a6);
+function getDefaultState2() {
+  return {
+    context: void 0,
+    data: void 0,
+    error: null,
+    failureCount: 0,
+    failureReason: null,
+    isPaused: false,
+    status: "idle",
+    variables: void 0,
+    submittedAt: 0
+  };
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/mutationCache.js
+var _mutations, _scopes, _mutationId, _a7;
+var MutationCache = (_a7 = class extends Subscribable {
+  constructor(config2 = {}) {
+    super();
+    __privateAdd(this, _mutations);
+    __privateAdd(this, _scopes);
+    __privateAdd(this, _mutationId);
+    this.config = config2;
+    __privateSet(this, _mutations, /* @__PURE__ */ new Set());
+    __privateSet(this, _scopes, /* @__PURE__ */ new Map());
+    __privateSet(this, _mutationId, 0);
+  }
+  build(client, options, state) {
+    const mutation = new Mutation({
+      client,
+      mutationCache: this,
+      mutationId: ++__privateWrapper(this, _mutationId)._,
+      options: client.defaultMutationOptions(options),
+      state
+    });
+    this.add(mutation);
+    return mutation;
+  }
+  add(mutation) {
+    __privateGet(this, _mutations).add(mutation);
+    const scope = scopeFor(mutation);
+    if (typeof scope === "string") {
+      const scopedMutations = __privateGet(this, _scopes).get(scope);
+      if (scopedMutations) {
+        scopedMutations.push(mutation);
+      } else {
+        __privateGet(this, _scopes).set(scope, [mutation]);
+      }
+    }
+    this.notify({ type: "added", mutation });
+  }
+  remove(mutation) {
+    if (__privateGet(this, _mutations).delete(mutation)) {
+      const scope = scopeFor(mutation);
+      if (typeof scope === "string") {
+        const scopedMutations = __privateGet(this, _scopes).get(scope);
+        if (scopedMutations) {
+          if (scopedMutations.length > 1) {
+            const index = scopedMutations.indexOf(mutation);
+            if (index !== -1) {
+              scopedMutations.splice(index, 1);
+            }
+          } else if (scopedMutations[0] === mutation) {
+            __privateGet(this, _scopes).delete(scope);
+          }
+        }
+      }
+    }
+    this.notify({ type: "removed", mutation });
+  }
+  canRun(mutation) {
+    const scope = scopeFor(mutation);
+    if (typeof scope === "string") {
+      const mutationsWithSameScope = __privateGet(this, _scopes).get(scope);
+      const firstPendingMutation = mutationsWithSameScope == null ? void 0 : mutationsWithSameScope.find(
+        (m) => m.state.status === "pending"
+      );
+      return !firstPendingMutation || firstPendingMutation === mutation;
+    } else {
+      return true;
+    }
+  }
+  runNext(mutation) {
+    var _a10, _b;
+    const scope = scopeFor(mutation);
+    if (typeof scope === "string") {
+      const foundMutation = (_a10 = __privateGet(this, _scopes).get(scope)) == null ? void 0 : _a10.find((m) => m !== mutation && m.state.isPaused);
+      return (_b = foundMutation == null ? void 0 : foundMutation.continue()) != null ? _b : Promise.resolve();
+    } else {
+      return Promise.resolve();
+    }
+  }
+  clear() {
+    notifyManager.batch(() => {
+      __privateGet(this, _mutations).forEach((mutation) => {
+        this.notify({ type: "removed", mutation });
+      });
+      __privateGet(this, _mutations).clear();
+      __privateGet(this, _scopes).clear();
+    });
+  }
+  getAll() {
+    return Array.from(__privateGet(this, _mutations));
+  }
+  find(filters) {
+    const defaultedFilters = { exact: true, ...filters };
+    return this.getAll().find(
+      (mutation) => matchMutation(defaultedFilters, mutation)
+    );
+  }
+  findAll(filters = {}) {
+    return this.getAll().filter((mutation) => matchMutation(filters, mutation));
+  }
+  notify(event) {
+    notifyManager.batch(() => {
+      this.listeners.forEach((listener) => {
+        listener(event);
+      });
+    });
+  }
+  resumePausedMutations() {
+    const pausedMutations = this.getAll().filter((x) => x.state.isPaused);
+    return notifyManager.batch(
+      () => Promise.all(
+        pausedMutations.map((mutation) => mutation.continue().catch(noop))
+      )
+    );
+  }
+}, _mutations = new WeakMap(), _scopes = new WeakMap(), _mutationId = new WeakMap(), _a7);
+function scopeFor(mutation) {
+  var _a10;
+  return (_a10 = mutation.options.scope) == null ? void 0 : _a10.id;
+}
+
+// ../../node_modules/@tanstack/query-core/build/modern/queryCache.js
+var _queries, _a8;
+var QueryCache = (_a8 = class extends Subscribable {
+  constructor(config2 = {}) {
+    super();
+    __privateAdd(this, _queries);
+    this.config = config2;
+    __privateSet(this, _queries, /* @__PURE__ */ new Map());
+  }
+  build(client, options, state) {
+    var _a10;
+    const queryKey = options.queryKey;
+    const queryHash = (_a10 = options.queryHash) != null ? _a10 : hashQueryKeyByOptions(queryKey, options);
+    let query = this.get(queryHash);
+    if (!query) {
+      query = new Query({
+        client,
+        queryKey,
+        queryHash,
+        options: client.defaultQueryOptions(options),
+        state,
+        defaultOptions: client.getQueryDefaults(queryKey)
+      });
+      this.add(query);
+    }
+    return query;
+  }
+  add(query) {
+    if (!__privateGet(this, _queries).has(query.queryHash)) {
+      __privateGet(this, _queries).set(query.queryHash, query);
+      this.notify({
+        type: "added",
+        query
+      });
+    }
+  }
+  remove(query) {
+    const queryInMap = __privateGet(this, _queries).get(query.queryHash);
+    if (queryInMap) {
+      query.destroy();
+      if (queryInMap === query) {
+        __privateGet(this, _queries).delete(query.queryHash);
+      }
+      this.notify({ type: "removed", query });
+    }
+  }
+  clear() {
+    notifyManager.batch(() => {
+      this.getAll().forEach((query) => {
+        this.remove(query);
+      });
+    });
+  }
+  get(queryHash) {
+    return __privateGet(this, _queries).get(queryHash);
+  }
+  getAll() {
+    return [...__privateGet(this, _queries).values()];
+  }
+  find(filters) {
+    const defaultedFilters = { exact: true, ...filters };
+    return this.getAll().find(
+      (query) => matchQuery(defaultedFilters, query)
+    );
+  }
+  findAll(filters = {}) {
+    const queries = this.getAll();
+    return Object.keys(filters).length > 0 ? queries.filter((query) => matchQuery(filters, query)) : queries;
+  }
+  notify(event) {
+    notifyManager.batch(() => {
+      this.listeners.forEach((listener) => {
+        listener(event);
+      });
+    });
+  }
+  onFocus() {
+    notifyManager.batch(() => {
+      this.getAll().forEach((query) => {
+        query.onFocus();
+      });
+    });
+  }
+  onOnline() {
+    notifyManager.batch(() => {
+      this.getAll().forEach((query) => {
+        query.onOnline();
+      });
+    });
+  }
+}, _queries = new WeakMap(), _a8);
+
+// ../../node_modules/@tanstack/query-core/build/modern/queryClient.js
+var _queryCache, _mutationCache2, _defaultOptions2, _queryDefaults, _mutationDefaults, _mountCount, _unsubscribeFocus, _unsubscribeOnline, _a9;
+var QueryClient = (_a9 = class {
+  constructor(config2 = {}) {
+    __privateAdd(this, _queryCache);
+    __privateAdd(this, _mutationCache2);
+    __privateAdd(this, _defaultOptions2);
+    __privateAdd(this, _queryDefaults);
+    __privateAdd(this, _mutationDefaults);
+    __privateAdd(this, _mountCount);
+    __privateAdd(this, _unsubscribeFocus);
+    __privateAdd(this, _unsubscribeOnline);
+    __privateSet(this, _queryCache, config2.queryCache || new QueryCache());
+    __privateSet(this, _mutationCache2, config2.mutationCache || new MutationCache());
+    __privateSet(this, _defaultOptions2, config2.defaultOptions || {});
+    __privateSet(this, _queryDefaults, /* @__PURE__ */ new Map());
+    __privateSet(this, _mutationDefaults, /* @__PURE__ */ new Map());
+    __privateSet(this, _mountCount, 0);
+  }
+  mount() {
+    __privateWrapper(this, _mountCount)._++;
+    if (__privateGet(this, _mountCount) !== 1) return;
+    __privateSet(this, _unsubscribeFocus, focusManager.subscribe(async (focused) => {
+      if (focused) {
+        await this.resumePausedMutations();
+        __privateGet(this, _queryCache).onFocus();
+      }
+    }));
+    __privateSet(this, _unsubscribeOnline, onlineManager.subscribe(async (online) => {
+      if (online) {
+        await this.resumePausedMutations();
+        __privateGet(this, _queryCache).onOnline();
+      }
+    }));
+  }
+  unmount() {
+    var _a10, _b;
+    __privateWrapper(this, _mountCount)._--;
+    if (__privateGet(this, _mountCount) !== 0) return;
+    (_a10 = __privateGet(this, _unsubscribeFocus)) == null ? void 0 : _a10.call(this);
+    __privateSet(this, _unsubscribeFocus, void 0);
+    (_b = __privateGet(this, _unsubscribeOnline)) == null ? void 0 : _b.call(this);
+    __privateSet(this, _unsubscribeOnline, void 0);
+  }
+  isFetching(filters) {
+    return __privateGet(this, _queryCache).findAll({ ...filters, fetchStatus: "fetching" }).length;
+  }
+  isMutating(filters) {
+    return __privateGet(this, _mutationCache2).findAll({ ...filters, status: "pending" }).length;
+  }
+  /**
+   * Imperative (non-reactive) way to retrieve data for a QueryKey.
+   * Should only be used in callbacks or functions where reading the latest data is necessary, e.g. for optimistic updates.
+   *
+   * Hint: Do not use this function inside a component, because it won't receive updates.
+   * Use `useQuery` to create a `QueryObserver` that subscribes to changes.
+   */
+  getQueryData(queryKey) {
+    var _a10;
+    const options = this.defaultQueryOptions({ queryKey });
+    return (_a10 = __privateGet(this, _queryCache).get(options.queryHash)) == null ? void 0 : _a10.state.data;
+  }
+  ensureQueryData(options) {
+    const defaultedOptions = this.defaultQueryOptions(options);
+    const query = __privateGet(this, _queryCache).build(this, defaultedOptions);
+    const cachedData = query.state.data;
+    if (cachedData === void 0) {
+      return this.fetchQuery(options);
+    }
+    if (options.revalidateIfStale && query.isStaleByTime(resolveStaleTime(defaultedOptions.staleTime, query))) {
+      void this.prefetchQuery(defaultedOptions);
+    }
+    return Promise.resolve(cachedData);
+  }
+  getQueriesData(filters) {
+    return __privateGet(this, _queryCache).findAll(filters).map(({ queryKey, state }) => {
+      const data = state.data;
+      return [queryKey, data];
+    });
+  }
+  setQueryData(queryKey, updater, options) {
+    const defaultedOptions = this.defaultQueryOptions({ queryKey });
+    const query = __privateGet(this, _queryCache).get(
+      defaultedOptions.queryHash
+    );
+    const prevData = query == null ? void 0 : query.state.data;
+    const data = functionalUpdate(updater, prevData);
+    if (data === void 0) {
+      return void 0;
+    }
+    return __privateGet(this, _queryCache).build(this, defaultedOptions).setData(data, { ...options, manual: true });
+  }
+  setQueriesData(filters, updater, options) {
+    return notifyManager.batch(
+      () => __privateGet(this, _queryCache).findAll(filters).map(({ queryKey }) => [
+        queryKey,
+        this.setQueryData(queryKey, updater, options)
+      ])
+    );
+  }
+  getQueryState(queryKey) {
+    var _a10;
+    const options = this.defaultQueryOptions({ queryKey });
+    return (_a10 = __privateGet(this, _queryCache).get(
+      options.queryHash
+    )) == null ? void 0 : _a10.state;
+  }
+  removeQueries(filters) {
+    const queryCache = __privateGet(this, _queryCache);
+    notifyManager.batch(() => {
+      queryCache.findAll(filters).forEach((query) => {
+        queryCache.remove(query);
+      });
+    });
+  }
+  resetQueries(filters, options) {
+    const queryCache = __privateGet(this, _queryCache);
+    return notifyManager.batch(() => {
+      queryCache.findAll(filters).forEach((query) => {
+        query.reset();
+      });
+      return this.refetchQueries(
+        {
+          type: "active",
+          ...filters
+        },
+        options
+      );
+    });
+  }
+  cancelQueries(filters, cancelOptions = {}) {
+    const defaultedCancelOptions = { revert: true, ...cancelOptions };
+    const promises = notifyManager.batch(
+      () => __privateGet(this, _queryCache).findAll(filters).map((query) => query.cancel(defaultedCancelOptions))
+    );
+    return Promise.all(promises).then(noop).catch(noop);
+  }
+  invalidateQueries(filters, options = {}) {
+    return notifyManager.batch(() => {
+      var _a10, _b;
+      __privateGet(this, _queryCache).findAll(filters).forEach((query) => {
+        query.invalidate();
+      });
+      if ((filters == null ? void 0 : filters.refetchType) === "none") {
+        return Promise.resolve();
+      }
+      return this.refetchQueries(
+        {
+          ...filters,
+          type: (_b = (_a10 = filters == null ? void 0 : filters.refetchType) != null ? _a10 : filters == null ? void 0 : filters.type) != null ? _b : "active"
+        },
+        options
+      );
+    });
+  }
+  refetchQueries(filters, options = {}) {
+    var _a10;
+    const fetchOptions = {
+      ...options,
+      cancelRefetch: (_a10 = options.cancelRefetch) != null ? _a10 : true
+    };
+    const promises = notifyManager.batch(
+      () => __privateGet(this, _queryCache).findAll(filters).filter((query) => !query.isDisabled() && !query.isStatic()).map((query) => {
+        let promise = query.fetch(void 0, fetchOptions);
+        if (!fetchOptions.throwOnError) {
+          promise = promise.catch(noop);
+        }
+        return query.state.fetchStatus === "paused" ? Promise.resolve() : promise;
+      })
+    );
+    return Promise.all(promises).then(noop);
+  }
+  fetchQuery(options) {
+    const defaultedOptions = this.defaultQueryOptions(options);
+    if (defaultedOptions.retry === void 0) {
+      defaultedOptions.retry = false;
+    }
+    const query = __privateGet(this, _queryCache).build(this, defaultedOptions);
+    return query.isStaleByTime(
+      resolveStaleTime(defaultedOptions.staleTime, query)
+    ) ? query.fetch(defaultedOptions) : Promise.resolve(query.state.data);
+  }
+  prefetchQuery(options) {
+    return this.fetchQuery(options).then(noop).catch(noop);
+  }
+  fetchInfiniteQuery(options) {
+    options.behavior = infiniteQueryBehavior(options.pages);
+    return this.fetchQuery(options);
+  }
+  prefetchInfiniteQuery(options) {
+    return this.fetchInfiniteQuery(options).then(noop).catch(noop);
+  }
+  ensureInfiniteQueryData(options) {
+    options.behavior = infiniteQueryBehavior(options.pages);
+    return this.ensureQueryData(options);
+  }
+  resumePausedMutations() {
+    if (onlineManager.isOnline()) {
+      return __privateGet(this, _mutationCache2).resumePausedMutations();
+    }
+    return Promise.resolve();
+  }
+  getQueryCache() {
+    return __privateGet(this, _queryCache);
+  }
+  getMutationCache() {
+    return __privateGet(this, _mutationCache2);
+  }
+  getDefaultOptions() {
+    return __privateGet(this, _defaultOptions2);
+  }
+  setDefaultOptions(options) {
+    __privateSet(this, _defaultOptions2, options);
+  }
+  setQueryDefaults(queryKey, options) {
+    __privateGet(this, _queryDefaults).set(hashKey(queryKey), {
+      queryKey,
+      defaultOptions: options
+    });
+  }
+  getQueryDefaults(queryKey) {
+    const defaults = [...__privateGet(this, _queryDefaults).values()];
+    const result = {};
+    defaults.forEach((queryDefault) => {
+      if (partialMatchKey(queryKey, queryDefault.queryKey)) {
+        Object.assign(result, queryDefault.defaultOptions);
+      }
+    });
+    return result;
+  }
+  setMutationDefaults(mutationKey, options) {
+    __privateGet(this, _mutationDefaults).set(hashKey(mutationKey), {
+      mutationKey,
+      defaultOptions: options
+    });
+  }
+  getMutationDefaults(mutationKey) {
+    const defaults = [...__privateGet(this, _mutationDefaults).values()];
+    const result = {};
+    defaults.forEach((queryDefault) => {
+      if (partialMatchKey(mutationKey, queryDefault.mutationKey)) {
+        Object.assign(result, queryDefault.defaultOptions);
+      }
+    });
+    return result;
+  }
+  defaultQueryOptions(options) {
+    if (options._defaulted) {
+      return options;
+    }
+    const defaultedOptions = {
+      ...__privateGet(this, _defaultOptions2).queries,
+      ...this.getQueryDefaults(options.queryKey),
+      ...options,
+      _defaulted: true
+    };
+    if (!defaultedOptions.queryHash) {
+      defaultedOptions.queryHash = hashQueryKeyByOptions(
+        defaultedOptions.queryKey,
+        defaultedOptions
+      );
+    }
+    if (defaultedOptions.refetchOnReconnect === void 0) {
+      defaultedOptions.refetchOnReconnect = defaultedOptions.networkMode !== "always";
+    }
+    if (defaultedOptions.throwOnError === void 0) {
+      defaultedOptions.throwOnError = !!defaultedOptions.suspense;
+    }
+    if (!defaultedOptions.networkMode && defaultedOptions.persister) {
+      defaultedOptions.networkMode = "offlineFirst";
+    }
+    if (defaultedOptions.queryFn === skipToken) {
+      defaultedOptions.enabled = false;
+    }
+    return defaultedOptions;
+  }
+  defaultMutationOptions(options) {
+    if (options == null ? void 0 : options._defaulted) {
+      return options;
+    }
+    return {
+      ...__privateGet(this, _defaultOptions2).mutations,
+      ...(options == null ? void 0 : options.mutationKey) && this.getMutationDefaults(options.mutationKey),
+      ...options,
+      _defaulted: true
+    };
+  }
+  clear() {
+    __privateGet(this, _queryCache).clear();
+    __privateGet(this, _mutationCache2).clear();
+  }
+}, _queryCache = new WeakMap(), _mutationCache2 = new WeakMap(), _defaultOptions2 = new WeakMap(), _queryDefaults = new WeakMap(), _mutationDefaults = new WeakMap(), _mountCount = new WeakMap(), _unsubscribeFocus = new WeakMap(), _unsubscribeOnline = new WeakMap(), _a9);
+
+// src/wallet-sdk/wagmi.ts
+var chains = [
+  { id: 1, name: "Ethereum", rpcUrl: "https://eth.public-rpc.com" },
+  { id: 11155111, name: "Sepolia", rpcUrl: "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161" },
+  { id: 137, name: "Polygon", rpcUrl: "https://polygon-rpc.com" },
+  { id: 10, name: "Optimism", rpcUrl: "https://mainnet.optimism.io" },
+  { id: 42161, name: "Arbitrum", rpcUrl: "https://arb1.arbitrum.io/rpc" },
+  { id: 8453, name: "Base", rpcUrl: "https://mainnet.base.org" }
+];
+var projectId = "2e789d28c2f0380f39fc2a7bd198dee7";
+var walletList = [
+  {
+    groupName: "\u63A8\u8350",
+    wallets: [
+      metaMaskWallet,
+      okxWallet,
+      imTokenWallet,
+      coinbaseWallet,
+      trustWallet
+    ]
+  },
+  {
+    groupName: "\u5176\u4ED6",
+    wallets: [
+      walletConnectWallet,
+      injectedWallet,
+      safeWallet
+    ]
+  }
+];
+var walletConfig = {
+  appName: "YC Directory UI",
+  projectId
+};
+var connectors = connectorsForWallets(
+  walletList,
+  walletConfig
+);
+var config = createConfig({
+  chains,
+  transports: Object.fromEntries(
+    chains.map((chain) => [chain.id, http()])
+  ),
+  connectors,
+  ssr: true,
+  // 持久化存储配置
+  storage: createStorage({
+    storage: typeof window !== "undefined" ? window.localStorage : void 0,
+    key: "ycdirectory-wagmi-store"
+  })
+});
+var queryClient = new QueryClient();
+
+// src/wallet-sdk/core/WalletSDK.ts
+var WalletSDK = class {
+  constructor(config2 = {}, useRainbowKit = true) {
+    this.initialized = false;
+    this.config = {
+      storage: typeof window !== "undefined" ? window.localStorage : void 0,
+      autoConnect: true,
+      ...config2
+    };
+    this.useRainbowKit = useRainbowKit;
+    this.manager = new WalletManager();
+  }
+  async initialize() {
+    if (this.initialized) {
+      console.log("\u{1F504} Wallet SDK \u5DF2\u7ECF\u521D\u59CB\u5316");
+      return;
+    }
+    console.log("\u{1F680} \u521D\u59CB\u5316 Wallet SDK...", { useRainbowKit: this.useRainbowKit });
+    try {
+      if (this.useRainbowKit) {
+        console.log("\u{1F308} \u4F7F\u7528 RainbowKit \u8FDE\u63A5\u5668");
+        this.initializeRainbowKit();
+      } else {
+        console.log("\u{1F6E0}\uFE0F \u4F7F\u7528\u81EA\u5B9A\u4E49\u94B1\u5305\u7BA1\u7406\u5668");
+        await this.manager.initialize(this.config);
+      }
+      this.initialized = true;
+      if (this.config.autoConnect) {
+        await this.autoConnect();
+      }
+      console.log("\u2705 Wallet SDK \u521D\u59CB\u5316\u5B8C\u6210");
+    } catch (error) {
+      console.error("\u274C Wallet SDK \u521D\u59CB\u5316\u5931\u8D25:", error);
+      throw error;
+    }
+  }
+  initializeRainbowKit() {
+    console.log("\u{1F308} RainbowKit \u8FDE\u63A5\u5668\u5DF2\u521D\u59CB\u5316");
+    console.log("\u{1F4CB} \u53EF\u7528\u8FDE\u63A5\u5668:", connectors.length);
+  }
+  // 连接管理
+  async connect(walletId) {
+    var _a10;
+    if (!this.initialized) {
+      throw new Error("Wallet SDK \u672A\u521D\u59CB\u5316\uFF0C\u8BF7\u5148\u8C03\u7528 initialize()");
+    }
+    if (this.useRainbowKit) {
+      console.log(`\u{1F308} RainbowKit \u8FDE\u63A5\u94B1\u5305: ${walletId || "\u9ED8\u8BA4"}`);
+      return {
+        success: true,
+        address: "0x1234567890123456789012345678901234567890",
+        chainId: 1,
+        wallet: {
+          id: walletId || "rainbowkit",
+          name: walletId || "RainbowKit Wallet",
+          installed: true
+        }
+      };
+    }
+    let targetWalletId = walletId;
+    if (!targetWalletId) {
+      const lastWallet = (_a10 = this.config.storage) == null ? void 0 : _a10.getItem("lastConnectedWallet");
+      targetWalletId = lastWallet || void 0;
+    }
+    if (!targetWalletId) {
+      const availableWallets = this.getAvailableWallets();
+      if (availableWallets.length > 0) {
+        targetWalletId = availableWallets[0].id;
+      }
+    }
+    if (!targetWalletId) {
+      throw new Error("\u6CA1\u6709\u53EF\u7528\u7684\u94B1\u5305");
+    }
+    return await this.manager.connectWallet(targetWalletId);
+  }
+  async disconnect() {
+    if (!this.initialized) return;
+    if (this.useRainbowKit) {
+      console.log("\u{1F308} RainbowKit \u65AD\u5F00\u8FDE\u63A5");
+      return;
+    }
+    await this.manager.disconnectWallet();
+  }
+  // 状态查询
+  isConnected() {
+    if (!this.initialized) return false;
+    const state = this.manager.getConnectionState();
+    return !!state.address;
+  }
+  getAddress() {
+    if (!this.initialized) return null;
+    const state = this.manager.getConnectionState();
+    return state.address;
+  }
+  getChainId() {
+    if (!this.initialized) return null;
+    const state = this.manager.getConnectionState();
+    return state.chainId;
+  }
+  async getBalance() {
+    if (!this.initialized || !this.isConnected()) {
+      return "0";
+    }
+    const address = this.getAddress();
+    if (!address) return "0";
+    try {
+      return "0.0000";
+    } catch (error) {
+      console.error("\u83B7\u53D6\u4F59\u989D\u5931\u8D25:", error);
+      return "0.0000";
+    }
+  }
+  async getTokenBalance(tokenAddress) {
+    if (!this.initialized || !this.isConnected()) {
+      return {
+        balance: "0",
+        decimals: 18,
+        symbol: "",
+        loading: false,
+        error: "\u94B1\u5305\u672A\u8FDE\u63A5"
+      };
+    }
+    const address = this.getAddress();
+    if (!address) {
+      return {
+        balance: "0",
+        decimals: 18,
+        symbol: "",
+        loading: false,
+        error: "\u94B1\u5305\u5730\u5740\u4E0D\u5B58\u5728"
+      };
+    }
+    try {
+      return {
+        balance: "0",
+        decimals: 18,
+        symbol: "TOKEN",
+        loading: false,
+        error: null
+      };
+    } catch (error) {
+      console.error("\u83B7\u53D6\u4EE3\u5E01\u4F59\u989D\u5931\u8D25:", error);
+      return {
+        balance: "0",
+        decimals: 18,
+        symbol: "",
+        loading: false,
+        error: error instanceof Error ? error.message : "\u83B7\u53D6\u4EE3\u5E01\u4F59\u989D\u5931\u8D25"
+      };
+    }
+  }
+  // 钱包管理
+  getAvailableWallets() {
+    if (!this.initialized) return [];
+    if (this.useRainbowKit) {
+      return [
+        { id: "metamask", name: "MetaMask", installed: true, iconUrl: "" },
+        { id: "okx", name: "OKX Wallet", installed: true, iconUrl: "" },
+        { id: "coinbase", name: "Coinbase Wallet", installed: true, iconUrl: "" },
+        { id: "trust", name: "Trust Wallet", installed: true, iconUrl: "" },
+        { id: "walletconnect", name: "WalletConnect", installed: true, iconUrl: "" },
+        { id: "imtoken", name: "imToken", installed: true, iconUrl: "" },
+        { id: "safe", name: "Safe", installed: true, iconUrl: "" }
+      ];
+    }
+    return this.manager.getAvailableWallets();
+  }
+  async switchChain(chainId) {
+    if (!this.initialized || !this.isConnected()) {
+      throw new Error("\u94B1\u5305\u672A\u8FDE\u63A5");
+    }
+    try {
+      console.log(`\u5207\u6362\u5230\u94FE: ${chainId}`);
+    } catch (error) {
+      console.error("\u5207\u6362\u94FE\u5931\u8D25:", error);
+      throw error;
+    }
+  }
+  // 事件管理
+  on(event, handler) {
+    if (this.useRainbowKit) {
+      console.log(`\u{1F308} RainbowKit \u4E8B\u4EF6\u76D1\u542C: ${event}`);
+      return;
+    }
+    this.manager.on(event, handler);
+  }
+  off(event, handler) {
+    if (this.useRainbowKit) {
+      console.log(`\u{1F308} RainbowKit \u79FB\u9664\u4E8B\u4EF6\u76D1\u542C: ${event}`);
+      return;
+    }
+    this.manager.off(event, handler);
+  }
+  // 私有方法
+  async autoConnect() {
+    var _a10, _b, _c, _d, _e;
+    if (this.useRainbowKit) {
+      console.log("\u{1F308} RainbowKit \u81EA\u52A8\u8FDE\u63A5\u903B\u8F91");
+      return;
+    }
+    try {
+      const lastWallet = (_a10 = this.config.storage) == null ? void 0 : _a10.getItem("lastConnectedWallet");
+      const address = (_b = this.config.storage) == null ? void 0 : _b.getItem("walletAddress");
+      if (lastWallet && address) {
+        console.log("\u{1F504} \u5C1D\u8BD5\u81EA\u52A8\u8FDE\u63A5...");
+        await this.connect(lastWallet);
+      }
+    } catch (error) {
+      console.warn("\u81EA\u52A8\u8FDE\u63A5\u5931\u8D25:", error);
+      (_c = this.config.storage) == null ? void 0 : _c.removeItem("lastConnectedWallet");
+      (_d = this.config.storage) == null ? void 0 : _d.removeItem("walletAddress");
+      (_e = this.config.storage) == null ? void 0 : _e.removeItem("walletChainId");
+    }
+  }
+  // 获取配置信息
+  getConfig() {
+    return { ...this.config };
+  }
+  // 检查是否初始化
+  isInitialized() {
+    return this.initialized;
+  }
+  // 获取 Wagmi 配置（用于 RainbowKit 集成）
+  getWagmiConfig() {
+    if (!this.useRainbowKit) {
+      throw new Error("RainbowKit \u672A\u542F\u7528");
+    }
+    return config;
+  }
+  // 获取连接器（用于 RainbowKit 集成）
+  getConnectors() {
+    if (!this.useRainbowKit) {
+      throw new Error("RainbowKit \u672A\u542F\u7528");
+    }
+    return connectors;
+  }
+  // 调试方法
+  redetectWallets() {
+    if (!this.useRainbowKit) {
+      this.manager.redetectWallets();
+    }
+  }
+  getDetectionDetails() {
+    if (!this.useRainbowKit) {
+      return this.manager.getDetectionDetails();
+    }
+    return { useRainbowKit: true };
+  }
+};
+
 // src/wallet-sdk/components/WalletProvider.tsx
 import {
   createContext,
@@ -648,21 +2954,8 @@ var WalletDeduplicator = class {
    * @returns 去重后的结果
    */
   static deduplicate(detected, configuredWallets) {
-    console.log("\u{1F50D} \u5F00\u59CB\u94B1\u5305\u53BB\u91CD...", detected, configuredWallets);
     const safeDetected = detected || [];
     const safeConfigured = configuredWallets || {};
-    console.log(
-      "\u68C0\u6D4B\u5230\u7684\u94B1\u5305:",
-      safeDetected.length > 0 ? safeDetected.map((w) => ({ name: w.name, id: w.id, rdns: w.rdns })) : "\u6CA1\u6709\u68C0\u6D4B\u5230\u94B1\u5305"
-    );
-    const nameMap = /* @__PURE__ */ new Map();
-    const rdnsMap = /* @__PURE__ */ new Map();
-    const sortedDetected = [...safeDetected].sort((a, b) => {
-      if (a.type === "eip6963" && b.type !== "eip6963") return -1;
-      if (b.type === "eip6963" && a.type !== "eip6963") return 1;
-      return 0;
-    });
-    console.log("deduplicateDetectedWallets", sortedDetected, nameMap, rdnsMap);
     const filteredDetected = this.deduplicateDetectedWallets(
       sortedDetected,
       nameMap,
@@ -672,80 +2965,40 @@ var WalletDeduplicator = class {
       safeConfigured,
       filteredDetected
     );
-    console.log("\u2705 \u53BB\u91CD\u5B8C\u6210");
-    console.log("\u6700\u7EC8\u68C0\u6D4B\u94B1\u5305\u6570\u91CF:", filteredDetected.length);
-    console.log("\u6700\u7EC8\u914D\u7F6E\u94B1\u5305\u7EC4\u6570:", Object.keys(staticFiltered).length);
     return {
       filtered: filteredDetected,
       staticFiltered
     };
   }
-  static deduplicateDetectedWallets(sortedDetected, nameMap, rdnsMap) {
+  static deduplicateDetectedWallets(sortedDetected2, nameMap2, rdnsMap2) {
     const filteredDetected = [];
-    if (!Array.isArray(sortedDetected)) {
+    if (!Array.isArray(sortedDetected2)) {
       console.warn("\u26A0\uFE0F sortedDetected \u4E0D\u662F\u6570\u7EC4\uFF0C\u8FD4\u56DE\u7A7A\u7ED3\u679C");
       return filteredDetected;
     }
-    if (sortedDetected.length === 0) {
-      console.log("\u26A0\uFE0F \u6CA1\u6709\u68C0\u6D4B\u5230\u94B1\u5305\uFF0C\u8FD4\u56DE\u7A7A\u7ED3\u679C");
+    if (sortedDetected2.length === 0) {
       return filteredDetected;
     }
-    for (const wallet of sortedDetected) {
+    for (const wallet of sortedDetected2) {
       const normalizedName = wallet.name.toLowerCase().trim();
-      const existingByName = nameMap.get(normalizedName);
-      const existingByRdns = rdnsMap.get(wallet.rdns);
+      const existingByName = nameMap2.get(normalizedName);
+      const existingByRdns = rdnsMap2.get(wallet.rdns);
       if (!existingByName && !existingByRdns) {
         filteredDetected.push(wallet);
-        nameMap.set(normalizedName, wallet);
-        rdnsMap.set(wallet.rdns, wallet);
-        console.log(
-          `\u2705 \u4FDD\u7559\u94B1\u5305: ${wallet.name} (${wallet.rdns}) [${wallet.type}]`
-        );
-      } else {
-        const existing = existingByName || existingByRdns;
-        if (existing && wallet.type === "eip6963" && existing.type !== "eip6963") {
-          const index = filteredDetected.findIndex(
-            (w) => w.rdns === existing.rdns
-          );
-          if (index !== -1) {
-            filteredDetected[index] = wallet;
-            nameMap.set(normalizedName, wallet);
-            rdnsMap.set(wallet.rdns, wallet);
-            console.log(
-              `\u{1F504} \u66FF\u6362\u94B1\u5305: ${existing.name} -> ${wallet.name} (\u66F4\u597D\u7684\u6807\u51C6)`
-            );
-          }
-        } else {
-          console.log(
-            `\u274C \u8DF3\u8FC7\u91CD\u590D\u94B1\u5305: ${wallet.name} (${wallet.rdns}) [${wallet.type}]`
-          );
-        }
+        nameMap2.set(normalizedName, wallet);
+        rdnsMap2.set(wallet.rdns, wallet);
       }
     }
     return filteredDetected;
   }
-  static filterConfiguredWallets(configuredWallets, detectedWallets) {
+  static filterConfiguredWallets(configuredWallets, filteredDetected) {
     const staticFiltered = {};
-    if (detectedWallets.length === 0) {
-      console.log("\u26A0\uFE0F \u6CA1\u6709\u68C0\u6D4B\u5230\u94B1\u5305\uFF0C\u8FD4\u56DE\u539F\u59CB\u914D\u7F6E\u94B1\u5305");
-      return configuredWallets;
-    }
-    const detectedNames = new Set(
-      detectedWallets.map((w) => w.name.toLowerCase().trim())
-    );
-    const detectedIds = new Set(
-      detectedWallets.map((w) => w.id.toLowerCase())
-    );
-    Object.entries(configuredWallets).forEach(([groupName, walletsInGroup]) => {
-      const filtered = walletsInGroup.filter((wallet) => {
-        const normalizedName = wallet.name.toLowerCase().trim();
-        const normalizedId = wallet.id.toLowerCase();
-        const isDuplicate = detectedNames.has(normalizedName) || detectedIds.has(normalizedId);
-        if (isDuplicate) {
-          console.log(`\u{1F6AB} \u8FC7\u6EE4\u914D\u7F6E\u94B1\u5305: ${wallet.name} (\u4E0E\u68C0\u6D4B\u5230\u7684\u94B1\u5305\u91CD\u590D)`);
-          return false;
-        }
-        return true;
+    Object.entries(configuredWallets).forEach(([groupName, wallets]) => {
+      const filtered = wallets.filter((wallet) => {
+        const existsInDetected = filteredDetected.some(
+          (detected) => detected.name.toLowerCase().trim() === wallet.name.toLowerCase().trim() || detected.rdns === wallet.rdns
+        );
+        return !existsInDetected;
       });
       if (filtered.length > 0) {
         staticFiltered[groupName] = filtered;
@@ -772,50 +3025,24 @@ var WalletModal = ({
   const [connectingWallet, setConnectingWallet] = useState(null);
   const [isGridLayout, setIsGridLayout] = useState(true);
   const allWallets = [];
-  console.log("\u{1F50D} WalletModal - \u5F00\u59CB\u5904\u7406\u94B1\u5305\uFF0C\u8BE6\u7EC6\u8C03\u8BD5\u4FE1\u606F:");
-  console.log("\u{1F4CB} walletInstances:", walletInstances);
-  console.log("\u{1F4CB} detectedWallets:", detectedWallets);
   Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
-    console.log(`  \u{1F3F7}\uFE0F \u7EC4\u540D: ${groupName}, \u94B1\u5305\u6570\u91CF: ${walletGroup.length}`);
-    walletGroup.forEach((wallet) => {
-      console.log(`    \u{1FAAA} \u94B1\u5305: ${wallet.name} (${wallet.id}) - \u5DF2\u5B89\u88C5: ${wallet.installed}`);
-    });
     allWallets.push(...walletGroup);
   });
-  console.log("\u{1F4E6} WalletModal \u5408\u5E76\u540E\u7684\u6240\u6709\u94B1\u5305\u6570\u91CF:", allWallets.length);
-  console.log("\u{1F4E6} WalletModal \u5408\u5E76\u540E\u7684\u6240\u6709\u94B1\u5305:", allWallets.map((w) => ({ name: w.name, id: w.id, installed: w.installed })));
   const installedWallets = allWallets.filter((wallet) => wallet.installed);
-  console.log("\u{1F4E6} WalletModal \u5DF2\u5B89\u88C5\u94B1\u5305\u6570\u91CF:", installedWallets.length);
-  console.log("\u{1F4E6} WalletModal \u5DF2\u5B89\u88C5\u94B1\u5305:", installedWallets.map((w) => ({ name: w.name, id: w.id, installed: w.installed })));
   const handleWalletSelect = async (walletId) => {
-    console.log("\u{1F680} \u7528\u6237\u9009\u62E9\u94B1\u5305:", walletId);
-    console.log("\u{1F50D} WalletModal - \u5F00\u59CB\u8FDE\u63A5\u94B1\u5305\uFF0C\u8BE6\u7EC6\u4FE1\u606F:");
-    console.log("  \u{1FAAA} \u94B1\u5305ID:", walletId);
     const selectedWallet = installedWallets.find((wallet) => wallet.id === walletId);
-    console.log("  \u{1F50E} \u627E\u5230\u7684\u94B1\u5305\u4FE1\u606F:", selectedWallet);
     if (!selectedWallet) {
       console.error("\u274C \u672A\u627E\u5230\u9009\u4E2D\u7684\u94B1\u5305:", walletId);
       return;
     }
     setConnectingWallet(walletId);
     try {
-      console.log("  \u{1F50C} \u8C03\u7528 onConnect\uFF0C\u53C2\u6570:", walletId);
       const result = await onConnect(walletId);
-      console.log("  \u2705 onConnect \u8FD4\u56DE\u7ED3\u679C:", result);
       if (result.success) {
-        console.log("\u2705 \u94B1\u5305\u8FDE\u63A5\u6210\u529F\uFF0C\u5173\u95ED\u5F39\u7A97");
-      } else {
-        console.log("\u274C \u94B1\u5305\u8FDE\u63A5\u5931\u8D25:", result.error);
       }
       onClose();
     } catch (error) {
       console.error("\u274C \u8FDE\u63A5\u94B1\u5305\u8FC7\u7A0B\u4E2D\u53D1\u751F\u9519\u8BEF:", error);
-      console.error("  \u{1F4CB} \u9519\u8BEF\u8BE6\u60C5:", {
-        message: error instanceof Error ? error.message : "\u672A\u77E5\u9519\u8BEF",
-        stack: error instanceof Error ? error.stack : void 0,
-        walletId,
-        selectedWallet: selectedWallet.name
-      });
       onClose();
     } finally {
       setConnectingWallet(null);
@@ -931,6 +3158,7 @@ import { jsx as jsx6, jsxs as jsxs5 } from "react/jsx-runtime";
 var WalletContext = createContext({
   address: "0x",
   chainId: null,
+  chainID: null,
   isConnecting: false,
   isConnected: false,
   isDisconnected: true,
@@ -967,8 +3195,8 @@ var WalletContext = createContext({
 });
 var WalletProvider = ({
   children,
-  config,
-  chains,
+  config: config2,
+  chains: chains2,
   provider,
   autoConnect,
   wallets
@@ -977,14 +3205,15 @@ var WalletProvider = ({
   const [state, setState] = useState2({
     address: "0x",
     chainId: null,
+    chainID: null,
     isConnecting: false,
     isConnected: false,
     isDisconnected: true,
     isReconnecting: false,
     ensName: null,
     error: null,
-    chains: chains || config.chains || [],
-    provider: provider || config.provider,
+    chains: chains2 || config2.chains || [],
+    provider: provider || config2.provider,
     balance: "0.0000",
     wallet: void 0,
     signer: void 0
@@ -1000,37 +3229,39 @@ var WalletProvider = ({
   useEffect(() => {
     const initializeWalletManager = async () => {
       try {
-        console.log("\u{1F680} \u521D\u59CB\u5316 WalletManager...");
         const manager = new WalletManager();
-        const walletConfig = {
-          projectId: config.projectId,
-          chains: chains || config.chains || [],
-          storage: config.storage || (typeof window !== "undefined" ? window.localStorage : void 0),
-          ...config
+        const walletConfig2 = {
+          projectId: config2.projectId,
+          chains: chains2 || config2.chains || [],
+          storage: config2.storage || (typeof window !== "undefined" ? window.localStorage : void 0),
+          ...config2
         };
         manager.initialize();
         const detectedWallets2 = manager.getWallets();
         setWalletManager(manager);
         manager.on("connect", (data) => {
-          console.log("\u{1F517} \u94B1\u5305\u8FDE\u63A5\u4E8B\u4EF6:", data);
-          setState((prev) => ({
-            ...prev,
-            isConnected: true,
-            isConnecting: false,
-            isDisconnected: false,
-            address: data.address,
-            chainId: data.chainId,
-            wallet: data.wallet ? {
-              id: data.wallet.id || data.walletId,
-              name: data.wallet.name || "Unknown",
-              installed: true
-            } : void 0,
-            error: null
-          }));
+          setState((prev) => {
+            var _a10;
+            return {
+              ...prev,
+              isConnected: true,
+              isConnecting: false,
+              isDisconnected: false,
+              address: data.address,
+              chainId: data.chainId,
+              chainID: ((_a10 = data.chainId) == null ? void 0 : _a10.toString()) || null,
+              provider: data.provider,
+              wallet: data.wallet ? {
+                id: data.wallet.id || data.walletId,
+                name: data.wallet.name || "Unknown",
+                installed: true
+              } : void 0,
+              error: null
+            };
+          });
           setCurrentWalletId(data.walletId);
         });
         manager.on("disconnect", () => {
-          console.log("\u{1F50C} \u94B1\u5305\u65AD\u5F00\u4E8B\u4EF6");
           setState((prev) => ({
             ...prev,
             isConnected: false,
@@ -1038,6 +3269,8 @@ var WalletProvider = ({
             isConnecting: false,
             address: "0x",
             chainId: null,
+            chainID: null,
+            provider: void 0,
             wallet: void 0,
             balance: "0.0000",
             signer: void 0,
@@ -1046,14 +3279,16 @@ var WalletProvider = ({
           setCurrentWalletId("");
         });
         manager.on("chainChanged", (data) => {
-          console.log("\u{1F504} \u94FE\u53D8\u5316\u4E8B\u4EF6:", data);
-          setState((prev) => ({
-            ...prev,
-            chainId: data.chainId
-          }));
+          setState((prev) => {
+            var _a10;
+            return {
+              ...prev,
+              chainId: data.chainId,
+              chainID: ((_a10 = data.chainId) == null ? void 0 : _a10.toString()) || null
+            };
+          });
         });
         manager.on("accountChanged", (data) => {
-          console.log("\u{1F464} \u8D26\u6237\u53D8\u5316\u4E8B\u4EF6:", data);
           setState((prev) => ({
             ...prev,
             address: data.accounts[0] || "0x"
@@ -1067,7 +3302,6 @@ var WalletProvider = ({
             isConnecting: false
           }));
         });
-        console.log("\u2705 WalletManager \u521D\u59CB\u5316\u5B8C\u6210");
       } catch (error) {
         console.error("\u521D\u59CB\u5316 WalletManager \u5931\u8D25:", error);
         setState((prev) => ({
@@ -1091,23 +3325,21 @@ var WalletProvider = ({
         });
       }
     };
-  }, [config, chains, provider]);
+  }, [config2, chains2, provider]);
   useEffect(() => {
     const initWallets = async () => {
       if (!walletManager) return;
       try {
         setWalletsLoading(true);
-        console.log("\u{1F504} \u5F00\u59CB\u94B1\u5305\u68C0\u6D4B...");
         const detectedWallets2 = walletManager.getWallets();
-        console.log("\u{1F4CB} \u68C0\u6D4B\u5230\u7684\u539F\u59CB\u94B1\u5305:", detectedWallets2);
         const configuredInstances = {};
-        if (wallets && config.projectId) {
+        if (wallets && config2.projectId) {
           wallets.forEach((group) => {
             if (group.groupName && group.wallets) {
               const groupWallets = group.wallets.map((createWalletFn) => {
                 return createWalletFn({
-                  projectId: config.projectId,
-                  appName: config.appName
+                  projectId: config2.projectId,
+                  appName: config2.appName
                 });
               });
               if (groupWallets.length > 0) {
@@ -1120,8 +3352,6 @@ var WalletProvider = ({
           detectedWallets2,
           configuredInstances
         );
-        console.log("\u{1F3AF} \u53BB\u91CD\u540E\u7684\u68C0\u6D4B\u94B1\u5305:", filteredDetected);
-        console.log("\u{1F3AF} \u53BB\u91CD\u540E\u7684\u914D\u7F6E\u94B1\u5305:", staticFiltered);
         setDetectedWallets(filteredDetected);
         const finalInstances = {};
         if (filteredDetected.length > 0) {
@@ -1143,7 +3373,6 @@ var WalletProvider = ({
           }
         });
         setWalletInstances(finalInstances);
-        console.log("\u{1F4E6} \u6700\u7EC8\u94B1\u5305\u5B9E\u4F8B:", finalInstances);
       } catch (error) {
         console.error("\u274C \u94B1\u5305\u68C0\u6D4B\u5931\u8D25:", error);
         setState((prev) => ({
@@ -1155,8 +3384,9 @@ var WalletProvider = ({
       }
     };
     initWallets();
-  }, [walletManager, wallets, config.projectId, config.appName]);
+  }, [walletManager, wallets, config2.projectId, config2.appName]);
   const connect = useCallback(async (walletId) => {
+    var _a10;
     if (!walletManager) {
       console.error("\u274C WalletProvider - WalletManager \u672A\u521D\u59CB\u5316");
       return {
@@ -1164,7 +3394,6 @@ var WalletProvider = ({
         error: "WalletManager \u672A\u521D\u59CB\u5316"
       };
     }
-    console.log("\u{1F680} WalletProvider - \u5F00\u59CB\u8FDE\u63A5\u94B1\u5305:", walletId);
     setState((prev) => ({
       ...prev,
       isConnecting: true,
@@ -1172,19 +3401,18 @@ var WalletProvider = ({
       error: null
     }));
     try {
-      console.log("  \u{1F50C} \u8C03\u7528 walletManager.connectWallet...");
       const result = await walletManager.connectWallet(walletId);
-      console.log("\u2705 WalletProvider - \u94B1\u5305\u8FDE\u63A5\u6210\u529F:", result);
       setIsModalOpen(false);
-      if (typeof window !== "undefined" && config.storage) {
-        config.storage.setItem("lastConnectedWallet", walletId);
-        config.storage.setItem("walletAddress", result.address || "");
-        config.storage.setItem("lastConnectionTime", Date.now().toString());
+      if (typeof window !== "undefined" && config2.storage) {
+        config2.storage.setItem("lastConnectedWallet", walletId);
+        config2.storage.setItem("walletAddress", result.address || "");
+        config2.storage.setItem("lastConnectionTime", Date.now().toString());
       }
       return {
         success: true,
         address: result.address,
         chainId: result.chainId,
+        chainID: ((_a10 = result.chainId) == null ? void 0 : _a10.toString()) || null,
         wallet: result.wallet,
         provider: result.provider
       };
@@ -1202,9 +3430,8 @@ var WalletProvider = ({
         error: errorMessage
       };
     }
-  }, [walletManager, config.storage]);
+  }, [walletManager, config2.storage]);
   const disconnect = useCallback(async () => {
-    console.log("\u{1F50C} \u5F00\u59CB\u65AD\u5F00\u94B1\u5305\u8FDE\u63A5", { walletId: currentWalletId });
     try {
       if (walletManager) {
         await walletManager.disconnectWallet(currentWalletId);
@@ -1212,11 +3439,10 @@ var WalletProvider = ({
     } catch (error) {
       console.warn("\u26A0\uFE0F \u65AD\u5F00\u94B1\u5305\u8FDE\u63A5\u5668\u65F6\u51FA\u9519:", error);
     }
-    if (typeof window !== "undefined" && config.storage) {
-      config.storage.removeItem("lastConnectedWallet");
-      config.storage.removeItem("walletAddress");
-      config.storage.removeItem("lastConnectionTime");
-      console.log("\u{1F9F9} \u5DF2\u6E05\u7406\u672C\u5730\u5B58\u50A8");
+    if (typeof window !== "undefined" && config2.storage) {
+      config2.storage.removeItem("lastConnectedWallet");
+      config2.storage.removeItem("walletAddress");
+      config2.storage.removeItem("lastConnectionTime");
     }
     setState((prev) => ({
       ...prev,
@@ -1224,6 +3450,8 @@ var WalletProvider = ({
       isDisconnected: true,
       address: "0x",
       chainId: null,
+      chainID: null,
+      provider: void 0,
       wallet: void 0,
       signer: void 0,
       balance: "0.0000",
@@ -1232,13 +3460,11 @@ var WalletProvider = ({
     }));
     setCurrentWalletId("");
     setTokenBalanceCache({});
-    console.log("\u2705 \u94B1\u5305\u65AD\u5F00\u8FDE\u63A5\u5B8C\u6210");
-  }, [walletManager, currentWalletId, config.storage]);
+  }, [walletManager, currentWalletId, config2.storage]);
   const switchChain = useCallback(async (chainId) => {
-    var _a;
+    var _a10;
     if (!walletManager) throw new Error("WalletManager \u672A\u521D\u59CB\u5316");
     try {
-      console.log("\u{1F504} \u5207\u6362\u94FE:", chainId);
       const currentWallet = walletManager.getWalletById(currentWalletId);
       if (!currentWallet) {
         throw new Error("\u672A\u627E\u5230\u5F53\u524D\u8FDE\u63A5\u7684\u94B1\u5305");
@@ -1250,22 +3476,27 @@ var WalletProvider = ({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: chainIdHex }]
         });
-        console.log(`\u2705 \u6210\u529F\u5207\u6362\u5230\u94FE ${chainId}`);
-        setState((prev) => ({ ...prev, chainId }));
+        setState((prev) => ({
+          ...prev,
+          chainId,
+          chainID: chainId.toString()
+        }));
         if (walletManager) {
-          (_a = walletManager.emit) == null ? void 0 : _a.call(walletManager, "chainChanged", { chainId });
+          (_a10 = walletManager.emit) == null ? void 0 : _a10.call(walletManager, "chainChanged", { chainId });
         }
       } catch (switchError) {
         if (switchError.code === 4902) {
-          console.log(`\u94FE ${chainId} \u4E0D\u5B58\u5728\uFF0C\u5C1D\u8BD5\u6DFB\u52A0...`);
           const chainConfig = getChainConfig(chainId);
           if (chainConfig) {
             await provider2.request({
               method: "wallet_addEthereumChain",
               params: [chainConfig]
             });
-            console.log(`\u2705 \u6210\u529F\u6DFB\u52A0\u5E76\u5207\u6362\u5230\u94FE ${chainId}`);
-            setState((prev) => ({ ...prev, chainId }));
+            setState((prev) => ({
+              ...prev,
+              chainId,
+              chainID: chainId.toString()
+            }));
           } else {
             throw new Error(`\u4E0D\u652F\u6301\u7684\u94FE ID: ${chainId}`);
           }
@@ -1329,16 +3560,10 @@ var WalletProvider = ({
   };
   const fetchBalance = useCallback(async () => {
     if (!state.isConnected || !state.address) {
-      console.log("\u26A0\uFE0F \u4F59\u989D\u83B7\u53D6\u8DF3\u8FC7 - \u94B1\u5305\u672A\u8FDE\u63A5\u6216\u5730\u5740\u4E3A\u7A7A", {
-        isConnected: state.isConnected,
-        address: state.address
-      });
       return;
     }
     try {
       setBalanceLoading(true);
-      console.log("\u{1F4B0} \u5F00\u59CB\u83B7\u53D6\u4F59\u989D...", state.address);
-      console.log("\u{1F50D} \u5F53\u524D chainId:", state.chainId);
       const currentWallet = walletManager == null ? void 0 : walletManager.getWalletById(currentWalletId);
       if (!currentWallet) {
         console.warn("\u26A0\uFE0F \u672A\u627E\u5230\u5F53\u524D\u8FDE\u63A5\u7684\u94B1\u5305", {
@@ -1347,29 +3572,19 @@ var WalletProvider = ({
         });
         return;
       }
-      console.log("\u{1F3AF} \u627E\u5230\u5F53\u524D\u94B1\u5305:", currentWallet.name);
       const provider2 = currentWallet.provider;
-      console.log("\u{1F4DE} \u8C03\u7528 eth_getBalance...");
       const balanceHex = await provider2.request({
         method: "eth_getBalance",
         params: [state.address, "latest"]
       });
-      console.log("\u{1F4CB} \u4F59\u989D\u539F\u59CB\u54CD\u5E94:", { balanceHex, type: typeof balanceHex });
       if (typeof balanceHex === "string") {
         const balanceWei = BigInt(balanceHex);
         const balanceEth = formatEther(balanceWei);
         const formattedBalance = parseFloat(balanceEth).toFixed(4);
-        console.log(`\u{1F4B0} \u4F59\u989D\u8BA1\u7B97\u8BE6\u60C5:`, {
-          hex: balanceHex,
-          wei: balanceWei.toString(),
-          eth: balanceEth,
-          formatted: formattedBalance
-        });
         setState((prev) => ({
           ...prev,
           balance: formattedBalance
         }));
-        console.log(`\u2705 \u4F59\u989D\u66F4\u65B0\u6210\u529F: ${formattedBalance} ETH`);
       } else {
         console.error("\u274C \u4F59\u989D\u54CD\u5E94\u7C7B\u578B\u9519\u8BEF:", typeof balanceHex, balanceHex);
       }
@@ -1517,31 +3732,29 @@ var WalletProvider = ({
         setAutoConnectAttempted(true);
         return;
       }
-      const lastConnectedWallet = typeof window !== "undefined" && config.storage ? config.storage.getItem("lastConnectedWallet") : null;
+      const lastConnectedWallet = typeof window !== "undefined" && config2.storage ? config2.storage.getItem("lastConnectedWallet") : null;
       if (!lastConnectedWallet) {
         setAutoConnectAttempted(true);
         return;
       }
-      console.log("\u{1F504} \u5C1D\u8BD5\u81EA\u52A8\u8FDE\u63A5:", lastConnectedWallet);
       try {
         const availableWallets = walletManager.getAvailableWallets();
         const walletExists = availableWallets.some((wallet) => wallet.id === lastConnectedWallet);
         if (walletExists) {
           await connect(lastConnectedWallet);
         } else {
-          console.log("\u{1F504} \u4E0A\u6B21\u8FDE\u63A5\u7684\u94B1\u5305\u4E0D\u5B58\u5728\uFF0C\u6E05\u7406\u5B58\u50A8");
-          if (typeof window !== "undefined" && config.storage) {
-            config.storage.removeItem("lastConnectedWallet");
-            config.storage.removeItem("walletAddress");
-            config.storage.removeItem("lastConnectionTime");
+          if (typeof window !== "undefined" && config2.storage) {
+            config2.storage.removeItem("lastConnectedWallet");
+            config2.storage.removeItem("walletAddress");
+            config2.storage.removeItem("lastConnectionTime");
           }
         }
       } catch (error) {
         console.warn("\u81EA\u52A8\u8FDE\u63A5\u5931\u8D25:", error);
-        if (typeof window !== "undefined" && config.storage) {
-          config.storage.removeItem("lastConnectedWallet");
-          config.storage.removeItem("walletAddress");
-          config.storage.removeItem("lastConnectionTime");
+        if (typeof window !== "undefined" && config2.storage) {
+          config2.storage.removeItem("lastConnectedWallet");
+          config2.storage.removeItem("walletAddress");
+          config2.storage.removeItem("lastConnectionTime");
         }
       } finally {
         setAutoConnectAttempted(true);
@@ -1554,7 +3767,7 @@ var WalletProvider = ({
     walletManager,
     walletsLoading,
     state.isConnected,
-    config.storage,
+    config2.storage,
     connect
   ]);
   const openModal = useCallback(() => setIsModalOpen(true), []);
@@ -1641,33 +3854,20 @@ var ConnectButton = ({
   };
   const handleConnect = async () => {
     try {
-      console.log("\u{1F50D} ConnectButton - \u5F00\u59CB\u8FDE\u63A5\uFF0C\u8BE6\u7EC6\u8C03\u8BD5\u4FE1\u606F:");
-      console.log("\u{1F4CB} walletInstances:", walletInstances);
-      console.log("\u{1F4CB} detectedWallets:", detectedWallets);
       const allWallets = [];
       if (walletInstances) {
-        console.log("\u{1F504} \u5904\u7406\u94B1\u5305\u5B9E\u4F8B\u7EC4:");
         Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
-          console.log(`  \u{1F3F7}\uFE0F \u7EC4\u540D: ${groupName}, \u94B1\u5305\u6570\u91CF: ${walletGroup.length}`);
-          walletGroup.forEach((wallet2) => {
-            console.log(`    \u{1FAAA} \u94B1\u5305: ${wallet2.name} (${wallet2.id}) - \u5DF2\u5B89\u88C5: ${wallet2.installed}`);
-          });
           allWallets.push(...walletGroup);
         });
       }
-      console.log("\u{1F4E6} \u5408\u5E76\u540E\u7684\u6240\u6709\u94B1\u5305\u6570\u91CF:", allWallets.length);
-      console.log("\u{1F4E6} \u5408\u5E76\u540E\u7684\u6240\u6709\u94B1\u5305:", allWallets.map((w) => ({ name: w.name, id: w.id, installed: w.installed })));
       if (allWallets.length === 0) {
-        console.warn("\u6CA1\u6709\u627E\u5230\u53EF\u7528\u7684\u94B1\u5305\uFF0C\u8BF7\u5B89\u88C5\u94B1\u5305\u6269\u5C55\u7A0B\u5E8F");
         return;
       }
       const installedWallets = allWallets.filter((wallet2) => wallet2.installed);
       if (installedWallets.length === 0) {
-        console.warn("\u6CA1\u6709\u5DF2\u5B89\u88C5\u7684\u94B1\u5305\uFF0C\u8BF7\u5148\u5B89\u88C5\u94B1\u5305\u6269\u5C55\u7A0B\u5E8F");
         return;
       }
       if (installedWallets.length === 1) {
-        console.log("\u{1F680} \u5F00\u59CB\u8FDE\u63A5\u94B1\u5305:", installedWallets[0].name);
         const result = await connect(installedWallets[0].id);
         if (onConnect) {
           onConnect(result);
@@ -1676,24 +3876,15 @@ var ConnectButton = ({
           closeModal();
         }
       } else {
-        console.log("\u{1F4F1} \u6253\u5F00\u94B1\u5305\u9009\u62E9\u5F39\u7A97\uFF0C\u53EF\u7528\u7684\u94B1\u5305:", installedWallets.map((w) => w.name));
         openModal();
       }
     } catch (error) {
       console.error("\u274C \u8FDE\u63A5\u94B1\u5305\u5931\u8D25:", error);
-      if (error instanceof Error) {
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage.includes("user rejected") || errorMessage.includes("user denied") || errorMessage.includes("user cancelled") || errorMessage.includes("\u62D2\u7EDD") || errorMessage.includes("\u53D6\u6D88")) {
-          console.log("\u2139\uFE0F \u7528\u6237\u62D2\u7EDD\u4E86\u94B1\u5305\u6388\u6743\u8BF7\u6C42");
-        }
-      }
     }
   };
   const handleDisconnect = async () => {
     try {
-      console.log("\u{1F50C} \u5F00\u59CB\u65AD\u5F00\u94B1\u5305\u8FDE\u63A5");
       await disconnect();
-      console.log("\u2705 \u94B1\u5305\u5DF2\u65AD\u5F00\u8FDE\u63A5");
       if (onDisconnect) {
         onDisconnect();
       }
@@ -1791,6 +3982,7 @@ var AccountDropdown = ({
   };
   const getChainName = (id) => {
     const chainNames = {
+      31337: "Localhost",
       1: "Ethereum",
       11155111: "Sepolia",
       137: "Polygon",
@@ -1802,6 +3994,7 @@ var AccountDropdown = ({
   };
   const getChainIcon = (id) => {
     const chainColors = {
+      31337: "bg-orange-500",
       1: "bg-blue-500",
       11155111: "bg-purple-500",
       137: "bg-purple-600",
@@ -1846,6 +4039,7 @@ var AccountDropdown = ({
     }
   };
   const supportedChains = [
+    { id: 31337, name: "Localhost (Hardhat)", shortName: "Local" },
     { id: 1, name: "Ethereum", shortName: "ETH" },
     { id: 11155111, name: "Sepolia Testnet", shortName: "Sepolia" },
     { id: 137, name: "Polygon", shortName: "MATIC" },
@@ -1919,7 +4113,6 @@ var AccountDropdown = ({
           "button",
           {
             onClick: () => {
-              console.log("\u{1F504} \u624B\u52A8\u5237\u65B0\u4F59\u989D...");
               fetchBalance();
             },
             disabled: balanceLoading,
@@ -1935,6 +4128,7 @@ var AccountDropdown = ({
           {
             onClick: () => {
               const explorerUrls = {
+                31337: "http://127.0.0.1:8545",
                 1: "https://etherscan.io",
                 11155111: "https://sepolia.etherscan.io",
                 137: "https://polygonscan.com",
@@ -1944,7 +4138,11 @@ var AccountDropdown = ({
               };
               const explorerUrl = chainId ? explorerUrls[chainId] : null;
               if (explorerUrl) {
-                window.open(`${explorerUrl}/address/${address}`, "_blank");
+                if (chainId === 31337) {
+                  alert("\u672C\u5730\u7F51\u7EDC\u4E0D\u652F\u6301\u6D4F\u89C8\u5668\u67E5\u770B\uFF0C\u8BF7\u4F7F\u7528\u5F00\u53D1\u5DE5\u5177\u8FDB\u884C\u8C03\u8BD5");
+                } else {
+                  window.open(`${explorerUrl}/address/${address}`, "_blank");
+                }
               }
             },
             className: "w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 rounded-md flex items-center space-x-3",
@@ -2111,6 +4309,7 @@ export {
   WalletManager,
   WalletModal_default as WalletModal,
   WalletProvider,
+  WalletSDK,
   useWallet,
   version
 };

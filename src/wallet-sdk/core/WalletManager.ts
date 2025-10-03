@@ -56,14 +56,11 @@ export class WalletManager {
 
   public initialize(): DetectedWallet[] {
     if (this.initialized) {
-      console.log("🔄 WalletManager 已经初始化，返回现有钱包");
       return this.getWallets();
     }
 
-    console.log("🚀 初始化 WalletManager...");
     this.detectWallets();
     this.initialized = true;
-    console.log("✅ WalletManager 初始化完成");
     return this.getWallets();
   }
 
@@ -72,9 +69,6 @@ export class WalletManager {
   }
 
   public async connectWallet(walletId: string): Promise<WalletConnectionResult> {
-    debugger; // 断点7: WalletManager connectWallet 开始
-    console.log(`🔌 WalletManager 连接钱包: ${walletId}`);
-
     const wallet = this.getWalletById(walletId);
     if (!wallet) {
       throw new Error(`钱包 ${walletId} 未找到或未安装`);
@@ -87,8 +81,6 @@ export class WalletManager {
     try {
       const connector = wallet.createConnector();
       const result = await connector.connect();
-
-      console.log(`🎉 ${wallet.name} 连接器返回结果:`, result);
 
       if (!result.accounts || result.accounts.length === 0) {
         throw new Error("连接器未返回账户信息");
@@ -111,8 +103,7 @@ export class WalletManager {
         signer: SignerFactory.createFromProvider(provider, address),
       };
 
-      console.log(`✅ ${wallet.name} 最终连接结果:`, connectionResult);
-
+      
       // 触发连接事件
       this.emit('connect', {
         address,
@@ -122,7 +113,8 @@ export class WalletManager {
           id: wallet.id,
           name: wallet.name,
           installed: wallet.installed,
-        }
+        },
+        provider,
       });
 
       return connectionResult;
@@ -134,21 +126,16 @@ export class WalletManager {
   }
 
   public async disconnectWallet(walletId: string): Promise<void> {
-    console.log(`🔌 WalletManager 断开钱包: ${walletId}`);
-
     if (!walletId) {
-      console.warn("⚠️ 钱包ID为空，跳过断开连接");
       return;
     }
 
     const wallet = this.getWalletById(walletId);
     if (!wallet) {
-      console.warn(`⚠️ 钱包 ${walletId} 未找到，跳过断开连接`);
       return;
     }
 
     if (!wallet.createConnector) {
-      console.warn(`⚠️ 钱包 ${wallet.name} 缺少连接器，跳过断开连接`);
       return;
     }
 
@@ -156,9 +143,6 @@ export class WalletManager {
       const connector = wallet.createConnector();
       if (connector.disconnect) {
         await connector.disconnect();
-        console.log(`✅ 钱包 ${wallet.name} 断开连接成功`);
-      } else {
-        console.log(`ℹ️ 钱包 ${wallet.name} 不支持程序化断开连接`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '未知错误';
@@ -167,8 +151,6 @@ export class WalletManager {
   }
 
   public async disconnectAll(): Promise<void> {
-    console.log("🔌 WalletManager 断开所有钱包连接");
-
     const wallets = this.getWallets();
     const disconnectPromises = wallets.map(wallet =>
       this.disconnectWallet(wallet.id).catch(error => {
@@ -177,7 +159,6 @@ export class WalletManager {
     );
 
     await Promise.allSettled(disconnectPromises);
-    console.log("✅ 所有钱包断开连接完成");
   }
 
   private async getChainIdSafe(provider: EthereumProvider): Promise<number | undefined> {
@@ -194,14 +175,11 @@ export class WalletManager {
 
   private detectWallets(): void {
     if (typeof window === 'undefined') {
-      console.log("⚠️ 非浏览器环境，跳过钱包检测");
       return;
     }
 
-    console.log("🔍 开始检测钱包...");
     this.detectEIP6963Wallets();
     this.detectLegacyWallets();
-    console.log(`🎯 检测完成，找到 ${this.wallets.size} 个钱包`);
   }
 
   private detectEIP6963Wallets(): void {
@@ -223,7 +201,6 @@ export class WalletManager {
     const ethereum = this.getEthereumProvider(windowEth);
 
     if (!ethereum) {
-      console.log("⚠️ 未找到 window.ethereum");
       return;
     }
 
@@ -311,13 +288,11 @@ export class WalletManager {
       createConnector: () => this.createStandardConnector(detail.provider, detail.info.name)
     };
 
-    console.log(`🔍 检测到钱包 (EIP-6963): ${wallet.name}`, wallet);
-    this.wallets.set(wallet.id, wallet);
+        this.wallets.set(wallet.id, wallet);
   }
 
   private addLegacyWallet(id: string, name: string, provider: EthereumProvider): void {
     if (this.wallets.has(id)) {
-      console.log(`⚠️ 钱包 ${name} 已存在，跳过`);
       return;
     }
 
@@ -332,30 +307,20 @@ export class WalletManager {
       createConnector: () => this.createStandardConnector(provider, name)
     };
 
-    console.log(`🔍 检测到钱包 (Legacy): ${wallet.name}`, wallet);
-    this.wallets.set(wallet.id, wallet);
+        this.wallets.set(wallet.id, wallet);
   }
 
   private createStandardConnector(provider: EthereumProvider, walletName: string): WalletConnector {
-    console.log(`🔌 为 ${walletName} 创建标准连接器`);
-
     const connector: WalletConnector = {
       id: '',
       name: walletName,
       provider,
 
       connect: async (): Promise<WalletConnectResult> => {
-        console.log(`🔄 ${walletName} 连接中...`);
-        console.log(`🔍 检查 provider:`, provider);
-        console.log(`🔍 Provider 类型:`, typeof provider);
-        console.log(`🔍 Provider 是否有 request 方法:`, typeof provider.request);
-
         try {
-          debugger; // 断点: 调用 eth_requestAccounts 前，检查 provider
           const accounts = await provider.request({
             method: 'eth_requestAccounts'
           });
-          console.log(`✅ ${walletName} 连接成功:`, accounts);
 
           const accountsArray = Array.isArray(accounts)
             ? accounts.filter((acc): acc is string => typeof acc === 'string')
@@ -385,15 +350,10 @@ export class WalletManager {
       },
 
       disconnect: async (): Promise<void> => {
-        console.log(`🔌 ${walletName} 连接器断开连接`);
-
         try {
           const disconnectableProvider = provider as DisconnectableProvider;
           if (disconnectableProvider.disconnect && typeof disconnectableProvider.disconnect === 'function') {
             await disconnectableProvider.disconnect();
-            console.log(`✅ ${walletName} provider 断开成功`);
-          } else {
-            console.log(`ℹ️ ${walletName} 不支持程序化断开，需要用户手动断开`);
           }
         } catch (error) {
           console.warn(`⚠️ ${walletName} 断开连接时出错:`, error);

@@ -59,6 +59,7 @@ const AccountDropdown: React.FC<AccountDropdownProps> = ({
   // 获取链名称
   const getChainName = (id: number | null) => {
     const chainNames: Record<number, string> = {
+      31337: 'Localhost',
       1: 'Ethereum',
       11155111: 'Sepolia',
       137: 'Polygon',
@@ -72,6 +73,7 @@ const AccountDropdown: React.FC<AccountDropdownProps> = ({
   // 获取链图标
   const getChainIcon = (id: number | null) => {
     const chainColors: Record<number, string> = {
+      31337: 'bg-orange-500',
       1: 'bg-blue-500',
       11155111: 'bg-purple-500',
       137: 'bg-purple-600',
@@ -125,6 +127,7 @@ const AccountDropdown: React.FC<AccountDropdownProps> = ({
 
   // 支持的链列表
   const supportedChains = [
+    { id: 31337, name: 'Localhost (Hardhat)', shortName: 'Local' },
     { id: 1, name: 'Ethereum', shortName: 'ETH' },
     { id: 11155111, name: 'Sepolia Testnet', shortName: 'Sepolia' },
     { id: 137, name: 'Polygon', shortName: 'MATIC' },
@@ -214,7 +217,6 @@ const AccountDropdown: React.FC<AccountDropdownProps> = ({
             {/* 刷新余额 */}
             <button
               onClick={() => {
-                console.log("🔄 手动刷新余额...");
                 fetchBalance();
               }}
               disabled={balanceLoading}
@@ -230,6 +232,7 @@ const AccountDropdown: React.FC<AccountDropdownProps> = ({
             <button
               onClick={() => {
                 const explorerUrls: Record<number, string> = {
+                  31337: 'http://127.0.0.1:8545',
                   1: 'https://etherscan.io',
                   11155111: 'https://sepolia.etherscan.io',
                   137: 'https://polygonscan.com',
@@ -239,7 +242,12 @@ const AccountDropdown: React.FC<AccountDropdownProps> = ({
                 };
                 const explorerUrl = chainId ? explorerUrls[chainId] : null;
                 if (explorerUrl) {
-                  window.open(`${explorerUrl}/address/${address}`, '_blank');
+                  // 对于本地网络，提示用户无法在浏览器中查看
+                  if (chainId === 31337) {
+                    alert('本地网络不支持浏览器查看，请使用开发工具进行调试');
+                  } else {
+                    window.open(`${explorerUrl}/address/${address}`, '_blank');
+                  }
                 }
               }}
               className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 rounded-md flex items-center space-x-3"
