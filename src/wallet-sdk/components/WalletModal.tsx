@@ -17,6 +17,13 @@ const WalletModal: React.FC<WalletModalProps> = ({
   const [connectingWallet, setConnectingWallet] = useState<string | null>(null);
   const [isGridLayout, setIsGridLayout] = useState(true);
 
+  console.log("🔍 WalletModal 渲染:", {
+    isOpen,
+    walletInstances,
+    detectedWallets,
+    walletsLoading
+  });
+
   // 合并所有可用的钱包（WalletProvider已经处理了去重）
   const allWallets: ExtendedWalletInfo[] = [];
 
@@ -25,34 +32,63 @@ const WalletModal: React.FC<WalletModalProps> = ({
     allWallets.push(...walletGroup);
   });
 
-  // 只显示已安装的钱包
-  const installedWallets = allWallets.filter(wallet => wallet.installed);
+  // 显示所有钱包（包括未安装的）
+  const allWalletsForDisplay = allWallets.length > 0 ? allWallets : [
+    {
+      id: 'metamask',
+      name: 'MetaMask',
+      installed: false,
+      icon: 'https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg',
+      iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg',
+      rdns: 'io.metamask',
+      type: 'injected' as const,
+      provider: undefined
+    }
+  ];
+
+  console.log("🔍 WalletModal 钱包统计:", {
+    allWalletsCount: allWallets.length,
+    displayWalletsCount: allWalletsForDisplay.length
+  });
 
   const handleWalletSelect = async (walletId: string) => {
+    console.log("🔍 WalletModal - 用户选择钱包:", walletId);
+
     // 查找选中的钱包信息
-    const selectedWallet = installedWallets.find(wallet => wallet.id === walletId);
+    const selectedWallet = allWalletsForDisplay.find(wallet => wallet.id === walletId);
 
     if (!selectedWallet) {
       console.error('❌ 未找到选中的钱包:', walletId);
       return;
     }
 
+    // 如果钱包未安装，显示提示
+    if (!selectedWallet.installed) {
+      console.log('💡 钱包未安装，提示用户:', selectedWallet.name);
+      // 这里可以添加安装提示逻辑
+      alert(`请先安装 ${selectedWallet.name} 钱包扩展程序`);
+      return;
+    }
+
     setConnectingWallet(walletId);
 
     try {
+      console.log("🔍 WalletModal - 开始连接钱包...");
       const result = await onConnect(walletId);
 
-      // 连接成功或失败后都关闭弹窗
-      if (result.success) {
-        // 连接成功
-      }
+      console.log("🔍 WalletModal - 连接结果:", result);
 
-      // 无论成功与否都关闭弹窗
-      onClose();
+      // 连接成功后关闭弹窗
+      if (result.success) {
+        console.log("🔍 WalletModal - 连接成功，关闭弹窗");
+        onClose();
+      } else {
+        console.log("🔍 WalletModal - 连接失败，保持弹窗打开让用户重试");
+        // 连接失败时不关闭弹窗，让用户可以重试
+      }
     } catch (error) {
       console.error('❌ 连接钱包过程中发生错误:', error);
-      // 发生错误时也关闭弹窗
-      onClose();
+      // 发生错误时不关闭弹窗，让用户可以重试
     } finally {
       setConnectingWallet(null);
     }
@@ -124,13 +160,13 @@ const WalletModal: React.FC<WalletModalProps> = ({
               </svg>
               检测钱包中...
             </div>
-          ) : installedWallets.length === 0 ? (
+          ) : allWalletsForDisplay.length === 0 ? (
             <div className={`text-center ${classes.secondaryText}`}>
               没有找到已安装的钱包，请安装钱包扩展程序
             </div>
           ) : (
             <div className={isGridLayout ? 'grid grid-cols-2 gap-4' : 'space-y-3'}>
-              {installedWallets.map((wallet) => {
+              {allWalletsForDisplay.map((wallet) => {
                 const iconSrc = typeof wallet.iconUrl === 'string'
                   ? wallet.iconUrl
                   : wallet.icon;
@@ -160,11 +196,9 @@ const WalletModal: React.FC<WalletModalProps> = ({
                       </div>
                     )}
                     <div className={`font-medium text-base ${classes.text} mb-1`}>{wallet.name}</div>
-                    {wallet.installed && (
-                      <div className={`text-sm ${classes.secondaryText}`}>
-                        已安装
-                      </div>
-                    )}
+                    <div className={`text-sm ${wallet.installed ? 'text-green-600' : classes.secondaryText}`}>
+                      {wallet.installed ? '已安装' : '未安装'}
+                    </div>
                     {connectingWallet === wallet.id && (
                       <div className="mt-3">
                         <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

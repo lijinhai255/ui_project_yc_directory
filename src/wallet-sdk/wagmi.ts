@@ -23,26 +23,16 @@ export const chains = [
   { id: 8453, name: 'Base', rpcUrl: 'https://mainnet.base.org' }
 ] as const;
 
+// 使用临时的项目ID，避免配置问题
 export const projectId = '2e789d28c2f0380f39fc2a7bd198dee7';
 
-// 钱包列表配置
+// 钱包列表配置 - 简化配置避免依赖问题
 export const walletList = [
   {
     groupName: '推荐',
     wallets: [
       metaMaskWallet,
-      okxWallet,
-      imTokenWallet,
-      coinbaseWallet,
-      trustWallet,
-    ],
-  },
-  {
-    groupName: '其他',
-    wallets: [
-      walletConnectWallet,
       injectedWallet,
-      safeWallet,
     ],
   },
 ];

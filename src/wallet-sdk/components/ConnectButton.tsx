@@ -50,42 +50,25 @@ const ConnectButton: React.FC<ConnectButtonProps> = ({
 
   const handleConnect = async () => {
     try {
-      // 使用已经去重的钱包实例（WalletProvider已处理去重）
-      const allWallets: any[] = [];
+      console.log("🔍 ConnectButton - 开始连接钱包", {
+        isConnected,
+        isConnecting,
+        walletInstances,
+        detectedWallets
+      });
 
-      // 只使用钱包实例中的钱包（已去重）
-      if (walletInstances) {
-        Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
-          allWallets.push(...walletGroup);
-        });
-      }
-
-      if (allWallets.length === 0) {
+      // 如果已经连接，直接断开连接
+      if (isConnected) {
+        console.log("🔍 ConnectButton - 钱包已连接，执行断开操作");
+        await handleDisconnect();
         return;
       }
 
-      // 获取已安装的钱包
-      const installedWallets = allWallets.filter(wallet => wallet.installed);
+      // 强制打开弹窗，让用户选择钱包
+      console.log("🔍 ConnectButton - 打开钱包弹窗");
+      openModal();
 
-      if (installedWallets.length === 0) {
-        return;
-      }
-
-      // 如果只有一个已安装的钱包，直接连接
-      if (installedWallets.length === 1) {
-        const result = await connect(installedWallets[0].id);
-        if (onConnect) {
-          onConnect(result);
-        }
-
-        // 连接成功后关闭弹窗（如果打开的话）
-        if (result.success) {
-          closeModal();
-        }
-      } else {
-        // 多个已安装的钱包，打开选择弹窗
-        openModal();
-      }
+      console.log("🔍 ConnectButton - 已打开钱包弹窗");
     } catch (error) {
       console.error('❌ 连接钱包失败:', error);
     }

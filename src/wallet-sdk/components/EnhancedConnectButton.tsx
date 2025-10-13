@@ -25,13 +25,24 @@ const EnhancedConnectButton: React.FC<EnhancedConnectButtonProps> = ({
   onConnect,
   onDisconnect,
 }) => {
+  const walletContext = useWallet();
+
+  console.log("🔍 EnhancedConnectButton - Wallet Context:", {
+    isConnected: walletContext.isConnected,
+    isConnecting: walletContext.isConnecting,
+    address: walletContext.address,
+    hasOpenModal: typeof walletContext.openModal === 'function',
+    hasWalletInstances: !!walletContext.walletInstances,
+    error: walletContext.error
+  });
+
   const {
     isConnected,
     isConnecting,
     address,
     error,
     openModal,
-  } = useWallet();
+  } = walletContext;
 
   // 尺寸样式
   const sizeClasses = {
@@ -59,13 +70,43 @@ const EnhancedConnectButton: React.FC<EnhancedConnectButtonProps> = ({
 
   // 处理连接
   const handleConnect = async () => {
-    try {
-      openModal();
-      if (onConnect) {
-        onConnect({ success: true });
+    console.log("🔍 EnhancedConnectButton - handleConnect 被调用", {
+      isConnected,
+      isConnecting
+    });
+
+    // 如果已经连接，直接断开连接
+    if (isConnected) {
+      console.log("🔍 EnhancedConnectButton - 钱包已连接，执行断开操作");
+      if (onDisconnect) {
+        onDisconnect();
       }
+      return;
+    }
+
+    if (!openModal) {
+      console.error("❌ openModal 函数不存在，可能没有在 WalletProvider 中使用");
+      if (onConnect) {
+        onConnect({
+          success: false,
+          error: '钱包上下文未正确初始化，请确保组件被 WalletProvider 包裹'
+        });
+      }
+      return;
+    }
+
+    try {
+      console.log("🔍 EnhancedConnectButton - 调用 openModal()");
+      openModal();
+
+      console.log("🔍 EnhancedConnectButton - openModal 调用成功");
+
+      // 不要在这里调用 onConnect，应该在真正连接成功后才调用
+      // if (onConnect) {
+      //   onConnect({ success: true });
+      // }
     } catch (error) {
-      console.error('连接失败:', error);
+      console.error('❌ 连接失败:', error);
       if (onConnect) {
         onConnect({
           success: false,

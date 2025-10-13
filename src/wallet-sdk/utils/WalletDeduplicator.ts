@@ -18,10 +18,24 @@ export class WalletDeduplicator {
   ): DeduplicationResult {
 
     // 确保 detected 和 configuredWallets 是有效的
-    const safeDetected = detected || [];
+    const safeDetected = Array.isArray(detected) ? detected : [];
     const safeConfigured = configuredWallets || {};
 
+    console.log("🔍 WalletDeduplicator 输入:", {
+      detected: safeDetected,
+      detectedLength: safeDetected.length,
+      configuredGroups: Object.keys(safeConfigured)
+    });
 
+    // 创建排序后的检测钱包列表和映射表
+    const sortedDetected = [...safeDetected].sort((a, b) => a.name.localeCompare(b.name));
+    const nameMap = new Map<string, DetectedWallet>();
+    const rdnsMap = new Map<string, DetectedWallet>();
+
+    console.log("🔍 排序后的钱包:", {
+      sortedDetected,
+      sortedLength: sortedDetected.length
+    });
 
     // 去重检测到的钱包
     const filteredDetected = this.deduplicateDetectedWallets(
@@ -36,6 +50,11 @@ export class WalletDeduplicator {
       filteredDetected
     );
 
+    console.log("🔍 去重结果:", {
+      filteredDetected,
+      filteredLength: filteredDetected.length,
+      staticFiltered
+    });
 
     return {
       filtered: filteredDetected,
@@ -50,28 +69,57 @@ export class WalletDeduplicator {
   ): DetectedWallet[] {
     const filteredDetected: DetectedWallet[] = [];
 
+    console.log("🔍 开始去重检测到的钱包:", {
+      input: sortedDetected,
+      inputLength: sortedDetected?.length || 0
+    });
+
     // 确保 sortedDetected 是数组且不为空
     if (!Array.isArray(sortedDetected)) {
-      console.warn("⚠️ sortedDetected 不是数组，返回空结果");
+      console.error("❌ sortedDetected 不是数组:", sortedDetected);
       return filteredDetected;
     }
 
     if (sortedDetected.length === 0) {
+      console.log("📝 sortedDetected 为空数组，返回空结果");
       return filteredDetected;
     }
 
     for (const wallet of sortedDetected) {
+      if (!wallet || typeof wallet !== 'object') {
+        console.warn("⚠️ 钱包对象无效:", wallet);
+        continue;
+      }
+
+      if (!wallet.name) {
+        console.warn("⚠️ 钱包名称为空:", wallet);
+        continue;
+      }
+
       const normalizedName = wallet.name.toLowerCase().trim();
       const existingByName = nameMap.get(normalizedName);
-      const existingByRdns = rdnsMap.get(wallet.rdns);
+      const existingByRdns = wallet.rdns ? rdnsMap.get(wallet.rdns) : undefined;
 
       if (!existingByName && !existingByRdns) {
         // 没有重复，添加到结果中
         filteredDetected.push(wallet);
         nameMap.set(normalizedName, wallet);
-        rdnsMap.set(wallet.rdns, wallet);
+        if (wallet.rdns) {
+          rdnsMap.set(wallet.rdns, wallet);
+        }
+        console.log("✅ 添加钱包:", wallet.name);
+      } else {
+        console.log("🔄 跳过重复钱包:", wallet.name, {
+          existingByName: existingByName?.name,
+          existingByRdns: existingByRdns?.name
+        });
       }
     }
+
+    console.log("🔍 去重完成:", {
+      result: filteredDetected,
+      resultLength: filteredDetected.length
+    });
 
     return filteredDetected;
   }

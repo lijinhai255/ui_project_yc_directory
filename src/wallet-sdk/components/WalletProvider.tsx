@@ -127,6 +127,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
 
         // 设置事件监听
         manager.on('connect', (data) => {
+          console.log("🔍 WalletProvider - 收到连接事件:", data);
           setState(prev => ({
             ...prev,
             isConnected: true,
@@ -144,6 +145,9 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
             error: null,
           }));
           setCurrentWalletId(data.walletId);
+
+          // 连接成功后可以选择性关闭 modal
+          // setIsModalOpen(false);
         });
 
         manager.on('disconnect', () => {
@@ -241,10 +245,29 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
         }
 
         // 使用去重器处理钱包
-        const { filtered: filteredDetected, staticFiltered } = WalletDeduplicator.deduplicate(
+        console.log("🔍 开始处理钱包:", {
           detectedWallets,
+          detectedWalletsLength: detectedWallets?.length || 0,
           configuredInstances
-        );
+        });
+
+        let filteredDetected: DetectedWallet[] = [];
+        let staticFiltered: { [groupName: string]: ExtendedWalletInfo[] } = {};
+
+        try {
+          const result = WalletDeduplicator.deduplicate(
+            detectedWallets,
+            configuredInstances
+          );
+          filteredDetected = result.filtered;
+          staticFiltered = result.staticFiltered;
+          console.log("✅ 钱包去重成功:", { result });
+        } catch (error) {
+          console.error("❌ 钱包去重失败:", error);
+          // 如果去重失败，使用原始数据
+          filteredDetected = Array.isArray(detectedWallets) ? detectedWallets : [];
+          staticFiltered = configuredInstances || {};
+        }
 
         
         setDetectedWallets(filteredDetected);
@@ -308,11 +331,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     }));
 
     try {
+      console.log("🔍 WalletProvider - 开始连接钱包:", walletId);
       const result = await walletManager.connectWallet(walletId);
 
+      console.log("🔍 WalletProvider - 钱包连接成功:", result);
 
-      // 状态会通过事件监听器自动更新
-      setIsModalOpen(false);
+      // 注意：不要在这里关闭 modal，让用户确认或者让 WalletModal 处理
+      // setIsModalOpen(false);
 
       // 保存连接状态
       if (typeof window !== 'undefined' && config.storage) {
@@ -782,8 +807,15 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
   ]);
 
   // 模态框控制
-  const openModal = useCallback(() => setIsModalOpen(true), []);
-  const closeModal = useCallback(() => setIsModalOpen(false), []);
+  const openModal = useCallback(() => {
+    console.log("🔍 WalletProvider - openModal 被调用，当前状态:", isModalOpen);
+    setIsModalOpen(true);
+  }, [isModalOpen]);
+
+  const closeModal = useCallback(() => {
+    console.log("🔍 WalletProvider - closeModal 被调用，当前状态:", isModalOpen);
+    setIsModalOpen(false);
+  }, [isModalOpen]);
 
   const value: WalletContextValue = {
     ...state,
@@ -799,6 +831,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({
     balanceLoading,
     getTokenBalance,
   };
+
+  console.log("🔍 WalletProvider - 渲染，modal 状态:", isModalOpen);
 
   return (
     <WalletContext.Provider value={value}>

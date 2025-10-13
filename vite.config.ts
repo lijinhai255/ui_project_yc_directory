@@ -18,9 +18,9 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.tsx'),
-      name: 'YCDirectoryUI',
+      name: 'YCSDKUI',
       formats: ['es', 'umd'],
-      fileName: (format) => `ycdirectory-ui.${format}.js`,
+      fileName: (format) => `yc-sdk-ui.${format}.js`,
     },
     rollupOptions: {
       external: ['react', 'react-dom'],

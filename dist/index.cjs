@@ -2676,18 +2676,7 @@ var walletList = [
     groupName: "\u63A8\u8350",
     wallets: [
       import_wallets.metaMaskWallet,
-      import_wallets.okxWallet,
-      import_wallets.imTokenWallet,
-      import_wallets.coinbaseWallet,
-      import_wallets.trustWallet
-    ]
-  },
-  {
-    groupName: "\u5176\u4ED6",
-    wallets: [
-      import_wallets.walletConnectWallet,
-      import_wallets.injectedWallet,
-      import_wallets.safeWallet
+      import_wallets.injectedWallet
     ]
   }
 ];
@@ -2976,8 +2965,20 @@ var WalletDeduplicator = class {
    * @returns 去重后的结果
    */
   static deduplicate(detected, configuredWallets) {
-    const safeDetected = detected || [];
+    const safeDetected = Array.isArray(detected) ? detected : [];
     const safeConfigured = configuredWallets || {};
+    console.log("\u{1F50D} WalletDeduplicator \u8F93\u5165:", {
+      detected: safeDetected,
+      detectedLength: safeDetected.length,
+      configuredGroups: Object.keys(safeConfigured)
+    });
+    const sortedDetected = [...safeDetected].sort((a, b) => a.name.localeCompare(b.name));
+    const nameMap = /* @__PURE__ */ new Map();
+    const rdnsMap = /* @__PURE__ */ new Map();
+    console.log("\u{1F50D} \u6392\u5E8F\u540E\u7684\u94B1\u5305:", {
+      sortedDetected,
+      sortedLength: sortedDetected.length
+    });
     const filteredDetected = this.deduplicateDetectedWallets(
       sortedDetected,
       nameMap,
@@ -2987,30 +2988,60 @@ var WalletDeduplicator = class {
       safeConfigured,
       filteredDetected
     );
+    console.log("\u{1F50D} \u53BB\u91CD\u7ED3\u679C:", {
+      filteredDetected,
+      filteredLength: filteredDetected.length,
+      staticFiltered
+    });
     return {
       filtered: filteredDetected,
       staticFiltered
     };
   }
-  static deduplicateDetectedWallets(sortedDetected2, nameMap2, rdnsMap2) {
+  static deduplicateDetectedWallets(sortedDetected, nameMap, rdnsMap) {
     const filteredDetected = [];
-    if (!Array.isArray(sortedDetected2)) {
-      console.warn("\u26A0\uFE0F sortedDetected \u4E0D\u662F\u6570\u7EC4\uFF0C\u8FD4\u56DE\u7A7A\u7ED3\u679C");
+    console.log("\u{1F50D} \u5F00\u59CB\u53BB\u91CD\u68C0\u6D4B\u5230\u7684\u94B1\u5305:", {
+      input: sortedDetected,
+      inputLength: (sortedDetected == null ? void 0 : sortedDetected.length) || 0
+    });
+    if (!Array.isArray(sortedDetected)) {
+      console.error("\u274C sortedDetected \u4E0D\u662F\u6570\u7EC4:", sortedDetected);
       return filteredDetected;
     }
-    if (sortedDetected2.length === 0) {
+    if (sortedDetected.length === 0) {
+      console.log("\u{1F4DD} sortedDetected \u4E3A\u7A7A\u6570\u7EC4\uFF0C\u8FD4\u56DE\u7A7A\u7ED3\u679C");
       return filteredDetected;
     }
-    for (const wallet of sortedDetected2) {
+    for (const wallet of sortedDetected) {
+      if (!wallet || typeof wallet !== "object") {
+        console.warn("\u26A0\uFE0F \u94B1\u5305\u5BF9\u8C61\u65E0\u6548:", wallet);
+        continue;
+      }
+      if (!wallet.name) {
+        console.warn("\u26A0\uFE0F \u94B1\u5305\u540D\u79F0\u4E3A\u7A7A:", wallet);
+        continue;
+      }
       const normalizedName = wallet.name.toLowerCase().trim();
-      const existingByName = nameMap2.get(normalizedName);
-      const existingByRdns = rdnsMap2.get(wallet.rdns);
+      const existingByName = nameMap.get(normalizedName);
+      const existingByRdns = wallet.rdns ? rdnsMap.get(wallet.rdns) : void 0;
       if (!existingByName && !existingByRdns) {
         filteredDetected.push(wallet);
-        nameMap2.set(normalizedName, wallet);
-        rdnsMap2.set(wallet.rdns, wallet);
+        nameMap.set(normalizedName, wallet);
+        if (wallet.rdns) {
+          rdnsMap.set(wallet.rdns, wallet);
+        }
+        console.log("\u2705 \u6DFB\u52A0\u94B1\u5305:", wallet.name);
+      } else {
+        console.log("\u{1F504} \u8DF3\u8FC7\u91CD\u590D\u94B1\u5305:", wallet.name, {
+          existingByName: existingByName == null ? void 0 : existingByName.name,
+          existingByRdns: existingByRdns == null ? void 0 : existingByRdns.name
+        });
       }
     }
+    console.log("\u{1F50D} \u53BB\u91CD\u5B8C\u6210:", {
+      result: filteredDetected,
+      resultLength: filteredDetected.length
+    });
     return filteredDetected;
   }
   static filterConfiguredWallets(configuredWallets, filteredDetected) {
@@ -3046,26 +3077,57 @@ var WalletModal = ({
 }) => {
   const [connectingWallet, setConnectingWallet] = (0, import_react.useState)(null);
   const [isGridLayout, setIsGridLayout] = (0, import_react.useState)(true);
+  console.log("\u{1F50D} WalletModal \u6E32\u67D3:", {
+    isOpen,
+    walletInstances,
+    detectedWallets,
+    walletsLoading
+  });
   const allWallets = [];
   Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
     allWallets.push(...walletGroup);
   });
-  const installedWallets = allWallets.filter((wallet) => wallet.installed);
+  const allWalletsForDisplay = allWallets.length > 0 ? allWallets : [
+    {
+      id: "metamask",
+      name: "MetaMask",
+      installed: false,
+      icon: "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg",
+      iconUrl: "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg",
+      rdns: "io.metamask",
+      type: "injected",
+      provider: void 0
+    }
+  ];
+  console.log("\u{1F50D} WalletModal \u94B1\u5305\u7EDF\u8BA1:", {
+    allWalletsCount: allWallets.length,
+    displayWalletsCount: allWalletsForDisplay.length
+  });
   const handleWalletSelect = async (walletId) => {
-    const selectedWallet = installedWallets.find((wallet) => wallet.id === walletId);
+    console.log("\u{1F50D} WalletModal - \u7528\u6237\u9009\u62E9\u94B1\u5305:", walletId);
+    const selectedWallet = allWalletsForDisplay.find((wallet) => wallet.id === walletId);
     if (!selectedWallet) {
       console.error("\u274C \u672A\u627E\u5230\u9009\u4E2D\u7684\u94B1\u5305:", walletId);
       return;
     }
+    if (!selectedWallet.installed) {
+      console.log("\u{1F4A1} \u94B1\u5305\u672A\u5B89\u88C5\uFF0C\u63D0\u793A\u7528\u6237:", selectedWallet.name);
+      alert(`\u8BF7\u5148\u5B89\u88C5 ${selectedWallet.name} \u94B1\u5305\u6269\u5C55\u7A0B\u5E8F`);
+      return;
+    }
     setConnectingWallet(walletId);
     try {
+      console.log("\u{1F50D} WalletModal - \u5F00\u59CB\u8FDE\u63A5\u94B1\u5305...");
       const result = await onConnect(walletId);
+      console.log("\u{1F50D} WalletModal - \u8FDE\u63A5\u7ED3\u679C:", result);
       if (result.success) {
+        console.log("\u{1F50D} WalletModal - \u8FDE\u63A5\u6210\u529F\uFF0C\u5173\u95ED\u5F39\u7A97");
+        onClose();
+      } else {
+        console.log("\u{1F50D} WalletModal - \u8FDE\u63A5\u5931\u8D25\uFF0C\u4FDD\u6301\u5F39\u7A97\u6253\u5F00\u8BA9\u7528\u6237\u91CD\u8BD5");
       }
-      onClose();
     } catch (error) {
       console.error("\u274C \u8FDE\u63A5\u94B1\u5305\u8FC7\u7A0B\u4E2D\u53D1\u751F\u9519\u8BEF:", error);
-      onClose();
     } finally {
       setConnectingWallet(null);
     }
@@ -3125,7 +3187,7 @@ var WalletModal = ({
         /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
       ] }),
       "\u68C0\u6D4B\u94B1\u5305\u4E2D..."
-    ] }) : installedWallets.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `text-center ${classes.secondaryText}`, children: "\u6CA1\u6709\u627E\u5230\u5DF2\u5B89\u88C5\u7684\u94B1\u5305\uFF0C\u8BF7\u5B89\u88C5\u94B1\u5305\u6269\u5C55\u7A0B\u5E8F" }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: isGridLayout ? "grid grid-cols-2 gap-4" : "space-y-3", children: installedWallets.map((wallet) => {
+    ] }) : allWalletsForDisplay.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `text-center ${classes.secondaryText}`, children: "\u6CA1\u6709\u627E\u5230\u5DF2\u5B89\u88C5\u7684\u94B1\u5305\uFF0C\u8BF7\u5B89\u88C5\u94B1\u5305\u6269\u5C55\u7A0B\u5E8F" }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: isGridLayout ? "grid grid-cols-2 gap-4" : "space-y-3", children: allWalletsForDisplay.map((wallet) => {
       const iconSrc = typeof wallet.iconUrl === "string" ? wallet.iconUrl : wallet.icon;
       return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
         "button",
@@ -3152,7 +3214,7 @@ var WalletModal = ({
               }
             ) }),
             /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `font-medium text-base ${classes.text} mb-1`, children: wallet.name }),
-            wallet.installed && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `text-sm ${classes.secondaryText}`, children: "\u5DF2\u5B89\u88C5" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `text-sm ${wallet.installed ? "text-green-600" : classes.secondaryText}`, children: wallet.installed ? "\u5DF2\u5B89\u88C5" : "\u672A\u5B89\u88C5" }),
             connectingWallet === wallet.id && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "mt-3", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("svg", { className: "animate-spin h-5 w-5 text-blue-600", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", children: [
               /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
               /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
@@ -3262,6 +3324,7 @@ var WalletProvider = ({
         const detectedWallets2 = manager.getWallets();
         setWalletManager(manager);
         manager.on("connect", (data) => {
+          console.log("\u{1F50D} WalletProvider - \u6536\u5230\u8FDE\u63A5\u4E8B\u4EF6:", data);
           setState((prev) => {
             var _a10;
             return {
@@ -3370,10 +3433,26 @@ var WalletProvider = ({
             }
           });
         }
-        const { filtered: filteredDetected, staticFiltered } = WalletDeduplicator.deduplicate(
-          detectedWallets2,
+        console.log("\u{1F50D} \u5F00\u59CB\u5904\u7406\u94B1\u5305:", {
+          detectedWallets: detectedWallets2,
+          detectedWalletsLength: (detectedWallets2 == null ? void 0 : detectedWallets2.length) || 0,
           configuredInstances
-        );
+        });
+        let filteredDetected = [];
+        let staticFiltered = {};
+        try {
+          const result = WalletDeduplicator.deduplicate(
+            detectedWallets2,
+            configuredInstances
+          );
+          filteredDetected = result.filtered;
+          staticFiltered = result.staticFiltered;
+          console.log("\u2705 \u94B1\u5305\u53BB\u91CD\u6210\u529F:", { result });
+        } catch (error) {
+          console.error("\u274C \u94B1\u5305\u53BB\u91CD\u5931\u8D25:", error);
+          filteredDetected = Array.isArray(detectedWallets2) ? detectedWallets2 : [];
+          staticFiltered = configuredInstances || {};
+        }
         setDetectedWallets(filteredDetected);
         const finalInstances = {};
         if (filteredDetected.length > 0) {
@@ -3423,8 +3502,9 @@ var WalletProvider = ({
       error: null
     }));
     try {
+      console.log("\u{1F50D} WalletProvider - \u5F00\u59CB\u8FDE\u63A5\u94B1\u5305:", walletId);
       const result = await walletManager.connectWallet(walletId);
-      setIsModalOpen(false);
+      console.log("\u{1F50D} WalletProvider - \u94B1\u5305\u8FDE\u63A5\u6210\u529F:", result);
       if (typeof window !== "undefined" && config2.storage) {
         config2.storage.setItem("lastConnectedWallet", walletId);
         config2.storage.setItem("walletAddress", result.address || "");
@@ -3792,8 +3872,14 @@ var WalletProvider = ({
     config2.storage,
     connect
   ]);
-  const openModal = (0, import_react2.useCallback)(() => setIsModalOpen(true), []);
-  const closeModal = (0, import_react2.useCallback)(() => setIsModalOpen(false), []);
+  const openModal = (0, import_react2.useCallback)(() => {
+    console.log("\u{1F50D} WalletProvider - openModal \u88AB\u8C03\u7528\uFF0C\u5F53\u524D\u72B6\u6001:", isModalOpen);
+    setIsModalOpen(true);
+  }, [isModalOpen]);
+  const closeModal = (0, import_react2.useCallback)(() => {
+    console.log("\u{1F50D} WalletProvider - closeModal \u88AB\u8C03\u7528\uFF0C\u5F53\u524D\u72B6\u6001:", isModalOpen);
+    setIsModalOpen(false);
+  }, [isModalOpen]);
   const value = {
     ...state,
     connect,
@@ -3808,6 +3894,7 @@ var WalletProvider = ({
     balanceLoading,
     getTokenBalance
   };
+  console.log("\u{1F50D} WalletProvider - \u6E32\u67D3\uFF0Cmodal \u72B6\u6001:", isModalOpen);
   return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(WalletContext.Provider, { value, children: [
     children,
     /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
@@ -3876,30 +3963,20 @@ var ConnectButton = ({
   };
   const handleConnect = async () => {
     try {
-      const allWallets = [];
-      if (walletInstances) {
-        Object.entries(walletInstances).forEach(([groupName, walletGroup]) => {
-          allWallets.push(...walletGroup);
-        });
-      }
-      if (allWallets.length === 0) {
+      console.log("\u{1F50D} ConnectButton - \u5F00\u59CB\u8FDE\u63A5\u94B1\u5305", {
+        isConnected,
+        isConnecting,
+        walletInstances,
+        detectedWallets
+      });
+      if (isConnected) {
+        console.log("\u{1F50D} ConnectButton - \u94B1\u5305\u5DF2\u8FDE\u63A5\uFF0C\u6267\u884C\u65AD\u5F00\u64CD\u4F5C");
+        await handleDisconnect();
         return;
       }
-      const installedWallets = allWallets.filter((wallet2) => wallet2.installed);
-      if (installedWallets.length === 0) {
-        return;
-      }
-      if (installedWallets.length === 1) {
-        const result = await connect(installedWallets[0].id);
-        if (onConnect) {
-          onConnect(result);
-        }
-        if (result.success) {
-          closeModal();
-        }
-      } else {
-        openModal();
-      }
+      console.log("\u{1F50D} ConnectButton - \u6253\u5F00\u94B1\u5305\u5F39\u7A97");
+      openModal();
+      console.log("\u{1F50D} ConnectButton - \u5DF2\u6253\u5F00\u94B1\u5305\u5F39\u7A97");
     } catch (error) {
       console.error("\u274C \u8FDE\u63A5\u94B1\u5305\u5931\u8D25:", error);
     }
@@ -4245,13 +4322,22 @@ var EnhancedConnectButton = ({
   onConnect,
   onDisconnect
 }) => {
+  const walletContext = useWallet();
+  console.log("\u{1F50D} EnhancedConnectButton - Wallet Context:", {
+    isConnected: walletContext.isConnected,
+    isConnecting: walletContext.isConnecting,
+    address: walletContext.address,
+    hasOpenModal: typeof walletContext.openModal === "function",
+    hasWalletInstances: !!walletContext.walletInstances,
+    error: walletContext.error
+  });
   const {
     isConnected,
     isConnecting,
     address,
     error,
     openModal
-  } = useWallet();
+  } = walletContext;
   const sizeClasses = {
     sm: "px-3 py-1.5 text-sm",
     md: "px-4 py-2 text-base",
@@ -4270,13 +4356,33 @@ var EnhancedConnectButton = ({
   `;
   const buttonClasses = `${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${className}`;
   const handleConnect = async () => {
-    try {
-      openModal();
-      if (onConnect) {
-        onConnect({ success: true });
+    console.log("\u{1F50D} EnhancedConnectButton - handleConnect \u88AB\u8C03\u7528", {
+      isConnected,
+      isConnecting
+    });
+    if (isConnected) {
+      console.log("\u{1F50D} EnhancedConnectButton - \u94B1\u5305\u5DF2\u8FDE\u63A5\uFF0C\u6267\u884C\u65AD\u5F00\u64CD\u4F5C");
+      if (onDisconnect) {
+        onDisconnect();
       }
+      return;
+    }
+    if (!openModal) {
+      console.error("\u274C openModal \u51FD\u6570\u4E0D\u5B58\u5728\uFF0C\u53EF\u80FD\u6CA1\u6709\u5728 WalletProvider \u4E2D\u4F7F\u7528");
+      if (onConnect) {
+        onConnect({
+          success: false,
+          error: "\u94B1\u5305\u4E0A\u4E0B\u6587\u672A\u6B63\u786E\u521D\u59CB\u5316\uFF0C\u8BF7\u786E\u4FDD\u7EC4\u4EF6\u88AB WalletProvider \u5305\u88F9"
+        });
+      }
+      return;
+    }
+    try {
+      console.log("\u{1F50D} EnhancedConnectButton - \u8C03\u7528 openModal()");
+      openModal();
+      console.log("\u{1F50D} EnhancedConnectButton - openModal \u8C03\u7528\u6210\u529F");
     } catch (error2) {
-      console.error("\u8FDE\u63A5\u5931\u8D25:", error2);
+      console.error("\u274C \u8FDE\u63A5\u5931\u8D25:", error2);
       if (onConnect) {
         onConnect({
           success: false,
