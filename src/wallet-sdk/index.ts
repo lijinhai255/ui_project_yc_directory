@@ -8,6 +8,8 @@ export { default as ConnectButton } from './components/ConnectButton';
 export { default as WalletModal } from './components/WalletModal';
 export { default as AccountDropdown } from './components/AccountDropdown';
 export { default as EnhancedConnectButton } from './components/EnhancedConnectButton';
+export { default as EnhancedAccountDropdown } from './components/EnhancedAccountDropdown';
+export { default as EIP1193EventDemo } from './components/EIP1193EventDemo';
 
 // 类型定义
 export type * from './types';
